@@ -61,7 +61,7 @@ public class AdminController {
     // 获取当前私钥
     @GetMapping("/private-key")
     public String getPrivateKey() {
-        return configService.getPrivateKey();  // 假设ConfigService可以获取私钥的内容
+        return configService.getPrivateKey();  // ConfigService获取私钥内容
     }
 
     // 修改私钥
