@@ -8,6 +8,7 @@ SERVICE_FILE="/etc/systemd/system/$APP_NAME.service"
 SECURITY_CONFIG_FILE="src/main/java/async/SecurityConfig.java"
 KEYSTORE_FILE="src/main/resources/keystore.jks"
 APPLICATION_PROPERTIES_FILE="src/main/resources/application.properties"
+SCRIPT_URL="https://raw.githubusercontent.com/YunZLu/SillyTavern_DecS/refs/heads/main/manage_project.sh"
 
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
@@ -60,7 +61,7 @@ function generate_ssl_certificate() {
     while true; do
         read -rp "请输入要为证书设置的密码（至少6位）: " keystore_password
 
-        if [ ${#keystore_password} -lt 6 ]; then
+        if [ ${#keystore_password} -lt 6 ];then
             echo -e "${RED}>>> 密码太短，至少需要6位字符。请重新输入。${NC}"
         else
             break
@@ -74,7 +75,7 @@ function generate_ssl_certificate() {
         -storepass "$keystore_password" -keypass "$keystore_password" \
         -dname "CN=$PUBLIC_IP, OU=SillyTavern, O=SillyTavern, L=City, S=State, C=US"
 
-    if [ $? -ne 0 ]; then
+    if [ $? -ne 0 ];then
         echo -e "${RED}>>> 证书生成失败${NC}"
         exit 1
     fi
@@ -134,7 +135,7 @@ function update_login_credentials() {
     # 使用 Java 来加密密码
     encrypted_password=$(encrypt_password "$password")
 
-    if [ -f "$APPLICATION_PROPERTIES_FILE" ]; then
+    if [ -f "$APPLICATION_PROPERTIES_FILE" ];then
         echo -e "${YELLOW}>>> 正在修改 application.properties 中的用户名和密码...${NC}"
 
         # 更新 application.properties 中的用户名和密码
@@ -142,6 +143,11 @@ function update_login_credentials() {
         sed -i "s/^app.security.password=.*/app.security.password=$encrypted_password/" "$APPLICATION_PROPERTIES_FILE"
 
         echo -e "${GREEN}>>> 用户名和密码已成功更新！${NC}"
+
+        # 自动重启 Spring Boot 应用以应用新的配置
+        echo -e "${YELLOW}>>> 重启服务以应用新配置...${NC}"
+        sudo systemctl restart "$APP_NAME"
+        echo -e "${GREEN}>>> 服务已成功重启，修改后的用户名和密码已生效！${NC}"
     else
         echo -e "${RED}>>> 找不到 application.properties 文件。${NC}"
     fi
@@ -149,7 +155,7 @@ function update_login_credentials() {
 
 # 克隆或更新项目
 function update_project() {
-    if [ -d "$PROJECT_NAME" ]; then
+    if [ -d "$PROJECT_NAME" ];then
         echo -e "${YELLOW}>>> 项目文件夹已存在，拉取最新代码...${NC}"
         cd "$PROJECT_NAME" || exit
         git pull
@@ -174,7 +180,7 @@ function find_latest_jar() {
 
 # 创建/更新 systemd 服务文件
 function setup_service() {
-    if [ ! -f "$SERVICE_FILE" ]; then
+    if [ ! -f "$SERVICE_FILE" ];then
         echo -e "${YELLOW}>>> 创建 systemd 服务文件...${NC}"
         sudo bash -c 'cat <<EOF > '"$SERVICE_FILE"'
 [Unit]
@@ -213,9 +219,25 @@ function check_service_status() {
     sudo systemctl status "$APP_NAME"
 }
 
+# 更新脚本并安全覆盖旧脚本
+function update_script() {
+    echo -e "${YELLOW}>>> 正在检查脚本更新...${NC}"
+    TEMP_SCRIPT=$(mktemp)  # 使用临时文件存放新脚本
+    curl -o "$TEMP_SCRIPT" "$SCRIPT_URL"  # 下载新脚本到临时文件
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}>>> 脚本已更新成功，正在重启脚本...${NC}"
+        chmod +x "$TEMP_SCRIPT"
+        mv "$TEMP_SCRIPT" "$0"  # 用新脚本覆盖当前脚本
+        exec "$0"  # 重新执行新脚本
+    else
+        echo -e "${RED}>>> 脚本更新失败，保留原脚本。请检查网络连接。${NC}"
+        rm -f "$TEMP_SCRIPT"  # 删除临时文件
+    fi
+}
+
 # 检查是否已部署，包括证书文件
 function is_deployed() {
-    if [ -d "$PROJECT_NAME" ] && [ -f "$SERVICE_FILE" ] && [ -f "$KEYSTORE_FILE" ]; then
+    if [ -d "$PROJECT_NAME" ] && [ -f "$SERVICE_FILE" ] && [ -f "$KEYSTORE_FILE" ];then
         return 0  # 已部署
     else
         return 1  # 未部署或证书缺失
