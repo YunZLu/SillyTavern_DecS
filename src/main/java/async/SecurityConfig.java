@@ -45,9 +45,9 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .csrf().disable()  // 禁用 CSRF（针对非浏览器应用）
-            .authorizeRequests()
-                .antMatchers("/admin/**").authenticated()  // 保护所有以 /admin/ 开头的 URL，必须登录后才能访问
-                .antMatchers("/login").permitAll()  // 允许所有用户访问 /login 页面
+            .authorizeHttpRequests()  // 更新此行
+                .requestMatchers("/admin/**").authenticated()  // 保护所有以 /admin/ 开头的 URL，必须登录后才能访问
+                .requestMatchers("/login").permitAll()  // 允许所有用户访问 /login 页面
                 .anyRequest().permitAll()  // 允许所有其他请求不需要登录
             .and()
             .formLogin()
