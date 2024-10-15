@@ -105,7 +105,7 @@
 
 <div class="container">
     <h2>登录</h2>
-    <form id="loginForm">
+    <form id="loginForm" onsubmit="handleLogin(event)">
         <input type="text" id="username" class="form-control" placeholder="请输入用户名" required>
         <input type="password" id="password" class="form-control" placeholder="请输入密码" required>
         <button type="submit" class="btn btn-custom">登录</button>
@@ -116,29 +116,30 @@
 </div>
 
 <script>
-    document.getElementById('loginForm').addEventListener('submit', function (e) {
-        e.preventDefault();
+    async function handleLogin(event) {
+        event.preventDefault();
         const username = document.getElementById('username').value;
         const password = document.getElementById('password').value;
 
-        fetch('/login', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ username, password })
-        })
-        .then(response => {
+        try {
+            const response = await fetch('/login', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ username, password })
+            });
+
             if (response.ok) {
                 window.location.href = '/admin.html';
             } else {
                 document.getElementById('errorMessage').classList.remove('d-none');
             }
-        })
-        .catch(() => {
+        } catch (error) {
             document.getElementById('errorMessage').classList.remove('d-none');
-        });
-    });
+            console.error('登录请求失败:', error);
+        }
+    }
 </script>
 
 </body>
