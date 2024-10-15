@@ -1,7 +1,9 @@
 {
   "whitelist": [
     "https://example1.com",
-    "https://example2.com"
+    "https://example2.com",
+    "https://example3.com"
   ],
-  "maxConcurrentRequestsPerIP": 5
+  "maxConcurrentRequestsPerIP": 5,
+  "privateKey": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkq...\n-----END PRIVATE KEY-----"
 }
