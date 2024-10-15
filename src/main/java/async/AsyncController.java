@@ -43,13 +43,22 @@ public class AsyncController {
         loadPrivateKey();            // 加载私钥
     }
 
-    private void loadPrivateKey() throws Exception {
-        this.privateKey = configService.getPrivateKeyObject();  // 从 ConfigService 获取私钥对象
+    private void loadPrivateKey() {
+        try {
+            this.privateKey = configService.getPrivateKeyObject();  // 从 ConfigService 获取私钥对象
+        } catch (Exception e) {
+            logger.warn("获取私钥时发生错误: {}，将私钥设置为 null", e.getMessage());
+            this.privateKey = null;  // 如果解码失败，将私钥设置为 null
+        }
     }
 
     // 修改解密消息的方法，直接处理十六进制字符串转字节数组
     public Mono<String> decryptMessage(String encryptedMessage) {
         return Mono.fromSupplier(() -> {
+            if (privateKey == null) {
+                logger.warn("私钥为 null，无法解密消息");
+                return encryptedMessage;  // 如果私钥为 null，直接返回原始消息
+            }
             try {
                 Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
                 cipher.init(Cipher.DECRYPT_MODE, privateKey);
