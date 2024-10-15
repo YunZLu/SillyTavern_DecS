@@ -13,6 +13,7 @@ import javax.annotation.PostConstruct;
 import javax.crypto.Cipher;
 import javax.xml.bind.DatatypeConverter;  // 用于十六进制字符串转字节数组
 import java.security.PrivateKey;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -88,9 +89,12 @@ public class AsyncController {
             return Flux.error(new IllegalArgumentException("没有消息需要处理"));
         }
 
+        // 每次请求时都重新获取最大同IP并发请求数
+        int maxIPConcurrentRequests = configService.getMaxIPConcurrentRequests();
+
         // 检查同IP并发请求限制
         int currentRequests = ipRequestCount.getOrDefault(clientIp, 0);
-        if (currentRequests >= configService.getMaxIPConcurrentRequests()) {
+        if (currentRequests >= maxIPConcurrentRequests) {
             return Flux.error(new IllegalArgumentException("来自该IP的并发请求过多"));
         }
 
@@ -99,8 +103,11 @@ public class AsyncController {
         // 处理特殊参数的逻辑
         String targetUrl = resolveTargetUrl(urlOrParam);
 
+        // 每次请求时都重新获取白名单
+        List<String> whitelist = configService.getWhitelist();
+
         // 检查URL是否在白名单中
-        if (!configService.getWhitelist().contains(targetUrl)) {
+        if (!whitelist.contains(targetUrl)) {
             ipRequestCount.put(clientIp, ipRequestCount.get(clientIp) - 1);
             return Flux.error(new IllegalArgumentException("URL不在白名单中"));
         }
