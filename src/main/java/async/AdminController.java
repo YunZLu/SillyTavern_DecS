@@ -1,6 +1,7 @@
 package async;
 
 import org.springframework.web.bind.annotation.*;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Pattern;
@@ -79,6 +80,13 @@ public class AdminController {
     public String updatePrivateKey(@RequestParam String privateKey) throws Exception {
         configService.updatePrivateKey(privateKey);  // 更新config.json中的私钥
         return "私钥更新成功";
+    }
+
+    // 通知 AsyncController 重新加载配置
+    @PostMapping("/reload-config")
+    public String reloadConfig() {
+        AsyncController.reloadConfig();  // 调用 AsyncController 的静态方法来重新加载配置
+        return "配置已重新加载成功";
     }
 
     // 验证 URL 的有效性
