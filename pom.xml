@@ -12,8 +12,8 @@
     <description>酒馆解密服务</description>
 
     <properties>
-        <java.version>11</java.version> <!-- 使用 Java 11 -->
-        <spring.boot.version>2.6.14</spring.boot.version>
+        <java.version>17</java.version>
+        <spring.boot.version>3.1.0</spring.boot.version>
         <jackson.version>2.14.0</jackson.version>
         <lombok.version>1.18.24</lombok.version>
         <slf4j.version>1.7.36</slf4j.version>
@@ -56,18 +56,6 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
             <version>${spring.boot.version}</version>
-        </dependency>
-
-        <!-- JAXB Dependencies -->
-        <dependency>
-            <groupId>javax.xml.bind</groupId>
-            <artifactId>jaxb-api</artifactId>
-            <version>2.3.1</version>
-        </dependency>
-        <dependency>
-            <groupId>org.glassfish.jaxb</groupId>
-            <artifactId>jaxb-runtime</artifactId>
-            <version>2.3.1</version>
         </dependency>
 
         <!-- Lombok for reducing boilerplate code -->
