@@ -38,6 +38,24 @@ public class ConfigService {
         return getPrivateKeyObject(); // 获取私钥对象
     }
 
+    // 获取私钥对象
+    public PrivateKey getPrivateKeyObject() {
+        try {
+            byte[] keyBytes = Base64.getDecoder().decode(privateKey);
+            PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
+            KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+            return keyFactory.generatePrivate(spec);
+        } catch (IllegalArgumentException e) {
+            // 记录私钥无效的错误
+            System.err.println("私钥无效，无法解码: " + e.getMessage());
+            return null; // 返回 null 而不是抛出异常
+        } catch (Exception e) {
+            // 记录其他加载私钥时发生的错误
+            System.err.println("加载私钥时发生错误: " + e.getMessage());
+            return null; // 返回 null 而不是抛出异常
+        }
+    }
+
     // 更新 config.json 文件中的配置
     public void updateConfig(List<String> whitelist, int maxIPConcurrentRequests) throws Exception {
         this.whitelist = whitelist;
@@ -61,14 +79,6 @@ public class ConfigService {
         try (FileWriter writer = new FileWriter(configFilePath)) {
             objectMapper.writeValue(writer, config);
         }
-    }
-
-    // 获取私钥对象
-    public PrivateKey getPrivateKeyObject() throws Exception {
-        byte[] keyBytes = Base64.getDecoder().decode(privateKey);
-        PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
-        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-        return keyFactory.generatePrivate(spec);
     }
 
     // 获取格式化私钥
