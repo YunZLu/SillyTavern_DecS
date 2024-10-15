@@ -47,7 +47,7 @@ public class AsyncController {
         this.privateKey = configService.getPrivateKeyObject();  // 从 ConfigService 获取私钥对象
     }
 
-    // 修改解密消息的方法，不进行 Base64 解码，而是直接处理十六进制字符串转字节数组
+    // 修改解密消息的方法，直接处理十六进制字符串转字节数组
     public Mono<String> decryptMessage(String encryptedMessage) {
         return Mono.fromSupplier(() -> {
             try {
@@ -103,22 +103,20 @@ public class AsyncController {
         logger.debug("转发的请求数据: {}", requestBodyData);
 
         // 使用 Flux.concat() 保证解密顺序
-        Flux<Void> decryptTasks = Flux.concat(
+        Flux<DataBuffer> result = Flux.concat(
             requestBodyData.getMessages().stream()
                 .map(message -> decryptMessage(message.getContent()).doOnNext(decryptedContent -> {
                     message.setContent(decryptedContent);  // 解密成功则更新内容，失败则保留原始内容
                 }))
                 .toList()
-        );
-
-        // 当解密完成后，转发解密后的数据到目标服务器，且转发过滤后的请求头
-        return decryptTasks
-            .thenMany(webClient.post()
+        ).flatMap(decryptedMessage -> webClient.post()
                 .uri(targetUrl)
                 .headers(httpHeaders -> httpHeaders.addAll(filteredHeaders))
                 .bodyValue(requestBodyData)
                 .retrieve()
-                .bodyToFlux(DataBuffer.class))
+                .bodyToFlux(DataBuffer.class));
+
+        return result
             .doFinally(signalType -> {
                 // 请求完成后，减少当前IP的并发请求数
                 ipRequestCount.put(clientIp, ipRequestCount.get(clientIp) - 1);
