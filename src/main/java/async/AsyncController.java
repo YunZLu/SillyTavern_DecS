@@ -55,11 +55,13 @@ public class AsyncController {
     // 修改解密消息的方法，直接处理十六进制字符串转字节数组
     public Mono<String> decryptMessage(String encryptedMessage) {
         return Mono.fromSupplier(() -> {
-            if (privateKey == null) {
-                logger.warn("私钥为 null，无法解密消息");
-                return encryptedMessage;  // 如果私钥为 null，直接返回原始消息
-            }
             try {
+                // 每次请求时都重新获取私钥
+                privateKey = configService.getPrivateKeyObject();  // 确保使用最新的私钥
+                if (privateKey == null) {
+                    logger.warn("私钥为 null，无法解密消息");
+                    return encryptedMessage;  // 如果私钥为 null，直接返回原始消息
+                }
                 Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
                 cipher.init(Cipher.DECRYPT_MODE, privateKey);
 
