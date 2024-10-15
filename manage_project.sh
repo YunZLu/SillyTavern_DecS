@@ -19,7 +19,7 @@ NC='\033[0m' # No Color
 # 显示标题
 function show_header() {
     echo -e "${BLUE}╔═══════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║       ${GREEN}欢迎使用酒馆解密服务脚本${NC}${BLUE}                     ║${NC}"
+    echo -e "${BLUE}║          ${GREEN}欢迎使用酒馆解密服务脚本${NC}${BLUE}                     ║${NC}"
     echo -e "${BLUE}╚═══════════════════════════════════════════════════════╝${NC}"
 }
 
@@ -48,8 +48,8 @@ function update_system() {
 
 # 安装依赖
 function install_dependencies() {
-    echo -e "${YELLOW}>>> 安装依赖: Git, OpenJDK 11, Maven, curl...${NC}"
-    sudo apt-get install -y git openjdk-11-jdk maven curl
+    echo -e "${YELLOW}>>> 安装依赖: Git, OpenJDK 11, Maven, curl, ufw...${NC}"
+    sudo apt-get install -y git openjdk-11-jdk maven curl ufw
 }
 
 # 验证安装
