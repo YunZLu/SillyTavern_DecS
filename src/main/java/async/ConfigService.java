@@ -1,3 +1,18 @@
+package async;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.core.io.ClassPathResource;
+import org.springframework.stereotype.Service;
+
+import java.io.File;
+import java.io.FileWriter;
+import java.security.KeyFactory;
+import java.security.PrivateKey;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.util.List;
+import java.util.Map;
+import java.util.Base64;
+
 @Service
 public class ConfigService {
 
@@ -19,6 +34,19 @@ public class ConfigService {
 
     // 更新 config.json 文件中的配置
     public void updateConfig(List<String> whitelist, int maxIPConcurrentRequests) throws Exception {
+        this.whitelist = whitelist;
+        this.maxIPConcurrentRequests = maxIPConcurrentRequests;
+        saveConfig();
+    }
+
+    // 更新私钥并保存到 config.json 文件
+    public void updatePrivateKey(String privateKey) throws Exception {
+        this.privateKey = privateKey.replaceAll("\\n", "");
+        saveConfig();
+    }
+
+    // 保存配置到 config.json
+    private void saveConfig() throws Exception {
         Map<String, Object> config = Map.of(
             "whitelist", whitelist,
             "maxConcurrentRequestsPerIP", maxIPConcurrentRequests,
@@ -27,29 +55,23 @@ public class ConfigService {
         try (FileWriter writer = new FileWriter(configFilePath)) {
             objectMapper.writeValue(writer, config);
         }
-        this.whitelist = whitelist;
-        this.maxIPConcurrentRequests = maxIPConcurrentRequests;
     }
 
-    // 更新私钥并保存到 config.json 文件
-    public void updatePrivateKey(String privateKey) throws Exception {
-        // 移除换行符并保存
-        String sanitizedPrivateKey = privateKey.replaceAll("\\n", "");
-        this.privateKey = sanitizedPrivateKey;
-        
-        Map<String, Object> config = Map.of(
-            "whitelist", whitelist,
-            "maxConcurrentRequestsPerIP", maxIPConcurrentRequests,
-            "privateKey", sanitizedPrivateKey
-        );
-        try (FileWriter writer = new FileWriter(configFilePath)) {
-            objectMapper.writeValue(writer, config);
-        }
+    // 获取私钥对象
+    public PrivateKey getPrivateKeyObject() throws Exception {
+        byte[] keyBytes = Base64.getDecoder().decode(privateKey);
+        PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
+        KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+        return keyFactory.generatePrivate(spec);
     }
 
-    // 获取私钥并格式化为带换行符的 PEM 格式
+    // 获取格式化私钥
     public String getPrivateKey() {
-        // 恢复私钥格式，每64个字符插入一个换行符
+        return formatPrivateKey(privateKey);
+    }
+
+    // 格式化私钥
+    private String formatPrivateKey(String privateKey) {
         StringBuilder formattedPrivateKey = new StringBuilder();
         formattedPrivateKey.append("-----BEGIN PRIVATE KEY-----\n");
         
