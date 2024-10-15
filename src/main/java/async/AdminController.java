@@ -28,7 +28,7 @@ public class AdminController {
     @PostMapping("/whitelist")
     public String addToWhitelist(@RequestParam String url) throws Exception {
         List<String> whitelist = new ArrayList<>(configService.getWhitelist());
-        
+
         // URL 验证
         if (!isValidUrl(url)) {
             return "无效的 URL: " + url;
@@ -37,6 +37,7 @@ public class AdminController {
         if (!whitelist.contains(url)) {
             whitelist.add(url);
             configService.updateConfig(whitelist, configService.getMaxIPConcurrentRequests());
+            AsyncController.reloadConfig(); // 更新后立即重载配置
             return "添加成功: " + url;
         }
         return "该 URL 已存在";
@@ -48,6 +49,7 @@ public class AdminController {
         List<String> whitelist = new ArrayList<>(configService.getWhitelist());
         if (whitelist.remove(url)) {
             configService.updateConfig(whitelist, configService.getMaxIPConcurrentRequests());
+            AsyncController.reloadConfig(); // 更新后立即重载配置
             return "删除成功: " + url;
         }
         return "未找到 URL";
@@ -64,6 +66,7 @@ public class AdminController {
     public String setMaxIPConcurrentRequests(@RequestParam int limit) throws Exception {
         if (limit > 0) {
             configService.updateConfig(configService.getWhitelist(), limit);
+            AsyncController.reloadConfig(); // 更新后立即重载配置
             return "设置成功, 最大同IP并发请求数为: " + limit;
         }
         return "无效的并发限制值";
@@ -72,20 +75,21 @@ public class AdminController {
     // 获取当前私钥
     @GetMapping("/private-key")
     public String getPrivateKey() {
-        return configService.getPrivateKey();  // ConfigService获取私钥内容
+        return configService.getPrivateKey(); // ConfigService获取私钥内容
     }
 
     // 修改私钥
     @PostMapping("/private-key")
     public String updatePrivateKey(@RequestParam String privateKey) throws Exception {
-        configService.updatePrivateKey(privateKey);  // 更新config.json中的私钥
+        configService.updatePrivateKey(privateKey); // 更新config.json中的私钥
+        AsyncController.reloadConfig(); // 更新后立即重载配置
         return "私钥更新成功";
     }
 
     // 通知 AsyncController 重新加载配置
     @PostMapping("/reload-config")
     public String reloadConfig() {
-        AsyncController.reloadConfig();  // 调用 AsyncController 的静态方法来重新加载配置
+        AsyncController.reloadConfig(); // 调用 AsyncController 的静态方法来重新加载配置
         return "配置已重新加载成功";
     }
 
