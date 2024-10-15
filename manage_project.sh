@@ -300,7 +300,6 @@ function show_menu() {
             ;;
         *)
             echo -e "${RED}>>> 无效的选择，请重新选择${NC}"
-            show_menu
             ;;
     esac
 }
@@ -309,7 +308,9 @@ function show_menu() {
 show_header
 if is_deployed; then
     echo -e "${GREEN}>>> 项目已部署。${NC}"
-    show_menu  # 如果项目已部署，则显示菜单
+    while true; do  # 用 while 循环包裹菜单
+        show_menu  # 如果项目已部署，则显示菜单
+    done
 else
     echo -e "${YELLOW}>>> 项目尚未部署，开始部署流程...${NC}"
     deploy_project  # 如果项目尚未部署，执行完整的部署流程
