@@ -23,6 +23,23 @@ function show_header() {
     echo -e "${BLUE}╚═══════════════════════════════════════════════════════╝${NC}"
 }
 
+# 通用重试函数
+function retry_function() {
+    local max_attempts=5
+    local attempt=1
+    local delay=2
+
+    while (( attempt <= max_attempts )); do
+        "$@" && return 0  # 执行传入的函数
+        echo -e "${RED}>>> 失败: $1，尝试第 $attempt 次...${NC}"
+        sleep "$delay"  # 等待 2 秒
+        ((attempt++))
+    done
+
+    echo -e "${RED}>>> 超过最大重试次数，操作失败: $1${NC}"
+    return 1
+}
+
 # 更新系统包
 function update_system() {
     echo -e "${YELLOW}>>> 更新系统包...${NC}"
@@ -246,12 +263,12 @@ function is_deployed() {
 
 # 执行初次部署流程
 function deploy_project() {
-    update_system
-    install_dependencies
+    retry_function update_system
+    retry_function install_dependencies
     check_installation
-    update_project
-    generate_ssl_certificate  # 生成 SSL 证书并配置 HTTPS
-    build_project
+    retry_function update_project
+    retry_function generate_ssl_certificate  # 生成 SSL 证书并配置 HTTPS
+    retry_function build_project
     find_latest_jar
     setup_service
     start_or_restart_service
@@ -274,17 +291,17 @@ function show_menu() {
     case $choice in
         1)
             echo -e "${YELLOW}>>> 你选择了启动/重启服务${NC}"
-            start_or_restart_service
+            retry_function start_or_restart_service
             check_service_status
             ;;
         2)
             echo -e "${YELLOW}>>> 你选择了更新项目管理脚本${NC}"
-            update_script
+            retry_function update_script
             ;;
         3)
             echo -e "${YELLOW}>>> 你选择了更新项目${NC}"
-            update_project
-            build_project
+            retry_function update_project
+            retry_function build_project
             find_latest_jar
             setup_service
             start_or_restart_service
