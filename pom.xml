@@ -12,13 +12,13 @@
     <description>酒馆解密服务</description>
 
     <properties>
-        <java.version>11</java.version> <!-- 修改为 Java 11 -->
-        <spring.boot.version>3.0.0</spring.boot.version> <!-- 确保 Spring Boot 版本支持 Java 11 -->
-        <jackson.version>2.14.0</jackson.version>
-        <lombok.version>1.18.24</lombok.version>
-        <slf4j.version>1.7.36</slf4j.version>
-        <reactor.version>3.4.15</reactor.version>
-        <spring.security.version>5.7.3</spring.security.version>
+        <java.version>11</java.version> <!-- 使用 Java 11 -->
+        <spring.boot.version>2.6.14</spring.boot.version> <!-- Spring Boot 版本 -->
+        <jackson.version>2.14.0</jackson.version> <!-- Jackson 版本 -->
+        <lombok.version>1.18.24</lombok.version> <!-- Lombok 版本 -->
+        <slf4j.version>1.7.36</slf4j.version> <!-- SLF4J 版本 -->
+        <reactor.version>3.4.15</reactor.version> <!-- Reactor 版本 -->
+        <spring.security.version>5.7.3</spring.security.version> <!-- Spring Security 版本 -->
     </properties>
 
     <dependencies>
