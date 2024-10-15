@@ -2,7 +2,6 @@ package async;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -14,12 +13,10 @@ import reactor.core.publisher.Mono;
 
 import javax.annotation.PostConstruct;
 import javax.crypto.Cipher;
+import javax.xml.bind.DatatypeConverter;  // 用于十六进制字符串转字节数组
 import java.security.KeyFactory;
 import java.security.PrivateKey;
 import java.security.spec.PKCS8EncodedKeySpec;
-import java.util.Base64;
-import java.util.Arrays;
-import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -58,33 +55,36 @@ public class AsyncController {
         privateKeyContent = privateKeyContent.replaceAll("\\n", "")
                                              .replace("-----BEGIN PRIVATE KEY-----", "")
                                              .replace("-----END PRIVATE KEY-----", "");
-        byte[] keyBytes = Base64.getDecoder().decode(privateKeyContent);
+        byte[] keyBytes = DatatypeConverter.parseBase64Binary(privateKeyContent);  // Base64解码私钥
         PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
         KeyFactory keyFactory = KeyFactory.getInstance("RSA");
         this.privateKey = keyFactory.generatePrivate(spec);
     }
 
-    // 异步解密消息
+    // 修改解密消息的方法，不进行 Base64 解码，而是直接处理十六进制字符串转字节数组
     public Mono<String> decryptMessage(String encryptedMessage) {
         return Mono.fromSupplier(() -> {
             try {
                 Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
                 cipher.init(Cipher.DECRYPT_MODE, privateKey);
-                byte[] decodedMessage = Base64.getDecoder().decode(encryptedMessage);
-                byte[] decryptedMessage = cipher.doFinal(decodedMessage);
-                return new String(decryptedMessage);
+                
+                // 将十六进制字符串转换为字节数组
+                byte[] encryptedBytes = DatatypeConverter.parseHexBinary(encryptedMessage);
+                
+                // 解密
+                byte[] decryptedMessage = cipher.doFinal(encryptedBytes);
+                return new String(decryptedMessage);  // 返回解密后的字符串
             } catch (Exception e) {
-                logger.error("解密消息失败: ", e);
-                return null;
+                return encryptedMessage;  // 如果解密失败，直接返回原始未加密内容
             }
         });
     }
 
-    // 捕获请求，解密消息，转发请求到目标服务器，并转发过滤后的请求头
+    // 捕获请求，异步解密消息，并保持顺序
     @PostMapping("/{urlOrParam}")
     public Flux<DataBuffer> captureAndForward(@PathVariable String urlOrParam, 
                                               @RequestBody RequestBodyData requestBodyData,
-                                              @RequestHeader HttpHeaders headers,  // 捕获所有请求头
+                                              @RequestHeader HttpHeaders headers,  
                                               @RequestHeader(value = "X-Forwarded-For", defaultValue = "localhost") String clientIp) {
         if (requestBodyData.getMessages() == null || requestBodyData.getMessages().isEmpty()) {
             return Flux.error(new IllegalArgumentException("No messages to process"));
@@ -93,27 +93,24 @@ public class AsyncController {
         // 检查同IP并发请求限制
         int currentRequests = ipRequestCount.getOrDefault(clientIp, 0);
         if (currentRequests >= configService.getMaxIPConcurrentRequests()) {
-            logger.warn("同IP请求超出限制: {}", clientIp);
             return Flux.error(new IllegalArgumentException("Too many concurrent requests from this IP"));
         }
 
-        // 增加当前IP的并发请求数
         ipRequestCount.put(clientIp, currentRequests + 1);
 
         // 处理特殊参数的逻辑
         String targetUrl;
         if (urlOrParam.equalsIgnoreCase("claude")) {
-            targetUrl = claudeUrl;  // 如果是 claude 参数，使用 claude 对应的 URL
+            targetUrl = claudeUrl;  
         } else if (urlOrParam.equalsIgnoreCase("clewd")) {
-            targetUrl = clewdUrl;  // 如果是 clewd 参数，使用 clewd 对应的 URL
+            targetUrl = clewdUrl;  
         } else {
             targetUrl = urlOrParam.startsWith("http") ? urlOrParam : "https://" + urlOrParam;
         }
 
         // 检查URL是否在白名单中
         if (!configService.getWhitelist().contains(targetUrl)) {
-            ipRequestCount.put(clientIp, ipRequestCount.get(clientIp) - 1);  // 减少并发数
-            logger.warn("目标URL不在白名单中: {}", targetUrl);
+            ipRequestCount.put(clientIp, ipRequestCount.get(clientIp) - 1);
             return Flux.error(new IllegalArgumentException("URL not in whitelist"));
         }
 
@@ -133,11 +130,11 @@ public class AsyncController {
         logger.debug("转发的请求头: {}", filteredHeaders);
         logger.debug("转发的请求数据: {}", requestBodyData);
 
-        // 并发执行解密操作
-        Mono<Void> decryptTasks = Mono.when(
+        // 使用 Flux.concat() 保证解密顺序
+        Flux<Void> decryptTasks = Flux.concat(
             requestBodyData.getMessages().stream()
                 .map(message -> decryptMessage(message.getContent()).doOnNext(decryptedContent -> {
-                    message.setContent(decryptedContent);  // 解密后的内容重新设置回 message
+                    message.setContent(decryptedContent);  // 解密成功则更新内容，失败则保留原始内容
                 }))
                 .toList()
         );
@@ -145,11 +142,11 @@ public class AsyncController {
         // 当解密完成后，转发解密后的数据到目标服务器，且转发过滤后的请求头
         return decryptTasks
             .thenMany(webClient.post()
-                .uri(targetUrl)  // 使用解密后的 URL 或特殊参数的映射 URL
-                .headers(httpHeaders -> httpHeaders.addAll(filteredHeaders))  // 添加转发的过滤后的请求头
-                .bodyValue(requestBodyData)  // 转发整个解密后的 requestBodyData
+                .uri(targetUrl)  
+                .headers(httpHeaders -> httpHeaders.addAll(filteredHeaders))  
+                .bodyValue(requestBodyData)  
                 .retrieve()
-                .bodyToFlux(DataBuffer.class))  // 流式接收响应
+                .bodyToFlux(DataBuffer.class))  
             .doFinally(signalType -> {
                 // 请求完成后，减少当前IP的并发请求数
                 ipRequestCount.put(clientIp, ipRequestCount.get(clientIp) - 1);
