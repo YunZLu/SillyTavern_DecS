@@ -66,11 +66,18 @@
             <optional>true</optional>
         </dependency>
 
-        <!-- SLF4J for Logging -->
+        <!-- SLF4J API -->
         <dependency>
             <groupId>org.slf4j</groupId>
             <artifactId>slf4j-api</artifactId>
             <version>${slf4j.version}</version>
+        </dependency>
+
+        <!-- Logback for Logging -->
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+            <version>1.2.11</version> <!-- 请确认使用的版本 -->
         </dependency>
 
         <!-- Spring Boot DevTools for development -->
