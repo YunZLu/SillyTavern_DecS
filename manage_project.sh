@@ -1,8 +1,9 @@
 #!/bin/bash
 
-GITHUB_REPO_URL="https://github.com/yourusername/yourrepository.git"
-PROJECT_NAME="SillyTavern-AsyncDecryptor"
-APP_NAME="sillytavern-async-app"
+# 更新后的 GitHub 仓库地址和项目名
+GITHUB_REPO_URL="https://github.com/YunZLu/SillyTavern_DecS.git"
+PROJECT_NAME="SillyTavern_DecS"
+APP_NAME="sillytavern-decs-app"
 SERVICE_FILE="/etc/systemd/system/$APP_NAME.service"
 SECURITY_CONFIG_FILE="src/main/java/async/SecurityConfig.java"
 KEYSTORE_FILE="src/main/resources/keystore.jks"
@@ -29,8 +30,8 @@ function update_system() {
 
 # 安装依赖
 function install_dependencies() {
-    echo -e "${YELLOW}>>> 安装依赖: Git, OpenJDK 11, Maven...${NC}"
-    sudo apt-get install -y git openjdk-11-jdk maven
+    echo -e "${YELLOW}>>> 安装依赖: Git, OpenJDK 11, Maven, curl...${NC}"
+    sudo apt-get install -y git openjdk-11-jdk maven curl
 }
 
 # 验证安装
@@ -38,6 +39,18 @@ function check_installation() {
     echo -e "${YELLOW}>>> 验证 Java 和 Maven 安装...${NC}"
     java -version
     mvn -version
+}
+
+# 自动获取服务器公网 IP 地址
+function get_public_ip() {
+    echo -e "${YELLOW}>>> 正在获取服务器公网 IP...${NC}"
+    PUBLIC_IP=$(curl -s http://checkip.amazonaws.com)
+    if [ -z "$PUBLIC_IP" ]; then
+        echo -e "${RED}>>> 无法获取服务器公网 IP。请检查网络连接。${NC}"
+        exit 1
+    else
+        echo -e "${GREEN}>>> 服务器公网 IP: $PUBLIC_IP${NC}"
+    fi
 }
 
 # 生成自签名证书，直到用户输入有效密码
@@ -54,9 +67,12 @@ function generate_ssl_certificate() {
         fi
     done
 
+    # 获取服务器的公网 IP
+    get_public_ip
+
     keytool -genkeypair -alias sillytavern -keyalg RSA -keysize 2048 -keystore "$KEYSTORE_FILE" -validity 365 \
         -storepass "$keystore_password" -keypass "$keystore_password" \
-        -dname "CN=localhost, OU=SillyTavern, O=SillyTavern, L=City, S=State, C=US"
+        -dname "CN=$PUBLIC_IP, OU=SillyTavern, O=SillyTavern, L=City, S=State, C=US"
 
     if [ $? -ne 0 ]; then
         echo -e "${RED}>>> 证书生成失败${NC}"
@@ -84,6 +100,51 @@ server.ssl.key-password=$keystore_password
 " >> "$APPLICATION_PROPERTIES_FILE"
 
     echo -e "${GREEN}>>> application.properties 配置已更新${NC}"
+}
+
+# 使用 Spring Security 的 BCryptPasswordEncoder 来加密密码
+function encrypt_password() {
+    password=$1
+    # 使用 Java 来执行 BCrypt 加密
+    ENCRYPTED_PASSWORD=$(java -cp "target/classes:target/dependency/*" org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder "$password")
+    echo "$ENCRYPTED_PASSWORD"
+}
+
+# 更新 application.properties 文件中的用户名和加密后的密码
+function update_login_credentials() {
+    read -rp "请输入新的用户名: " username
+
+    while true; do
+        echo -n "请输入新的密码: "
+        password=$(hidden_password_input)
+        echo
+
+        echo -n "请确认新的密码: "
+        confirm_password=$(hidden_password_input)
+        echo
+
+        if [[ "$password" == "$confirm_password" ]]; then
+            echo -e "${GREEN}>>> 密码已确认。${NC}"
+            break
+        else
+            echo -e "${RED}>>> 两次输入的密码不一致，请重新输入。${NC}"
+        fi
+    done
+
+    # 使用 Java 来加密密码
+    encrypted_password=$(encrypt_password "$password")
+
+    if [ -f "$APPLICATION_PROPERTIES_FILE" ]; then
+        echo -e "${YELLOW}>>> 正在修改 application.properties 中的用户名和密码...${NC}"
+
+        # 更新 application.properties 中的用户名和密码
+        sed -i "s/^app.security.username=.*/app.security.username=$username/" "$APPLICATION_PROPERTIES_FILE"
+        sed -i "s/^app.security.password=.*/app.security.password=$encrypted_password/" "$APPLICATION_PROPERTIES_FILE"
+
+        echo -e "${GREEN}>>> 用户名和密码已成功更新！${NC}"
+    else
+        echo -e "${RED}>>> 找不到 application.properties 文件。${NC}"
+    fi
 }
 
 # 克隆或更新项目
@@ -150,41 +211,6 @@ function start_or_restart_service() {
 function check_service_status() {
     echo -e "${YELLOW}>>> 检查服务状态...${NC}"
     sudo systemctl status "$APP_NAME"
-}
-
-# 修改用户名和密码
-function update_login_credentials() {
-    read -rp "请输入新的用户名: " username
-
-    while true; do
-        echo -n "请输入新的密码: "
-        password=$(hidden_password_input)
-        echo
-
-        echo -n "请确认新的密码: "
-        confirm_password=$(hidden_password_input)
-        echo
-
-        if [[ "$password" == "$confirm_password" ]]; then
-            echo -e "${GREEN}>>> 密码已确认。${NC}"
-            break
-        else
-            echo -e "${RED}>>> 两次输入的密码不一致，请重新输入。${NC}"
-        fi
-    done
-
-    if [ -f "$SECURITY_CONFIG_FILE" ]; then
-        echo -e "${YELLOW}>>> 正在修改用户名和密码...${NC}"
-
-        escaped_password=$(echo "$password" | sed 's/[\/&]/\\&/g')
-
-        sed -i "s/\(username = \).*/\1\"$username\";/" "$SECURITY_CONFIG_FILE"
-        sed -i "s/\(password = \).*/\1\"{noop}$escaped_password\";/" "$SECURITY_CONFIG_FILE"
-
-        echo -e "${GREEN}>>> 用户名和密码已成功更新！${NC}"
-    else
-        echo -e "${RED}>>> 找不到 SecurityConfig.java 文件。${NC}"
-    fi
 }
 
 # 检查是否已部署，包括证书文件
@@ -266,4 +292,3 @@ else
     echo -e "${YELLOW}>>> 项目尚未部署，开始部署流程...${NC}"
     deploy_project  # 如果项目尚未部署，执行完整的部署流程
 fi
-
