@@ -142,6 +142,21 @@
                 </executions>
                 <configuration>
                     <mainClass>async.AsyncApplication</mainClass>
+                    <classifier>exec</classifier>
+                </configuration>
+            </plugin>
+
+            <!-- Maven Jar Plugin -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <version>3.2.2</version>
+                <configuration>
+                    <archive>
+                        <manifest>
+                            <mainClass>async.AsyncApplication</mainClass>
+                        </manifest>
+                    </archive>
                 </configuration>
             </plugin>
 
