@@ -5,5 +5,5 @@
     "https://example3.com"
   ],
   "maxConcurrentRequestsPerIP": 5,
-  "privateKey": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkq...\n-----END PRIVATE KEY-----"
+  "privateKey": "MIIEvQIBADANBgkq..."
 }
