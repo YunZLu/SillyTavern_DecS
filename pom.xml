@@ -13,12 +13,12 @@
 
     <properties>
         <java.version>11</java.version> <!-- 使用 Java 11 -->
-        <spring.boot.version>2.6.14</spring.boot.version> <!-- Spring Boot 版本 -->
-        <jackson.version>2.14.0</jackson.version> <!-- Jackson 版本 -->
-        <lombok.version>1.18.24</lombok.version> <!-- Lombok 版本 -->
-        <slf4j.version>1.7.36</slf4j.version> <!-- SLF4J 版本 -->
-        <reactor.version>3.4.15</reactor.version> <!-- Reactor 版本 -->
-        <spring.security.version>5.7.3</spring.security.version> <!-- Spring Security 版本 -->
+        <spring.boot.version>2.6.14</spring.boot.version>
+        <jackson.version>2.14.0</jackson.version>
+        <lombok.version>1.18.24</lombok.version>
+        <slf4j.version>1.7.36</slf4j.version>
+        <reactor.version>3.4.15</reactor.version>
+        <spring.security.version>5.7.3</spring.security.version>
     </properties>
 
     <dependencies>
@@ -56,6 +56,18 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
             <version>${spring.boot.version}</version>
+        </dependency>
+
+        <!-- JAXB Dependencies -->
+        <dependency>
+            <groupId>javax.xml.bind</groupId>
+            <artifactId>jaxb-api</artifactId>
+            <version>2.3.1</version>
+        </dependency>
+        <dependency>
+            <groupId>org.glassfish.jaxb</groupId>
+            <artifactId>jaxb-runtime</artifactId>
+            <version>2.3.1</version>
         </dependency>
 
         <!-- Lombok for reducing boilerplate code -->
