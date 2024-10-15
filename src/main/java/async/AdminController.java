@@ -1,13 +1,17 @@
 package async;
 
 import org.springframework.web.bind.annotation.*;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/admin")
 public class AdminController {
 
     private final ConfigService configService;
+    private static final String URL_REGEX = "^(https?://)[^\\s/$.?#].[^\\s]*$"; // 简单的 URL 验证正则表达式
+    private static final Pattern URL_PATTERN = Pattern.compile(URL_REGEX);
 
     public AdminController(ConfigService configService) {
         this.configService = configService;
@@ -22,7 +26,13 @@ public class AdminController {
     // 添加 URL 到白名单
     @PostMapping("/whitelist")
     public String addToWhitelist(@RequestParam String url) throws Exception {
-        List<String> whitelist = configService.getWhitelist();
+        List<String> whitelist = new ArrayList<>(configService.getWhitelist());
+        
+        // URL 验证
+        if (!isValidUrl(url)) {
+            return "无效的 URL: " + url;
+        }
+
         if (!whitelist.contains(url)) {
             whitelist.add(url);
             configService.updateConfig(whitelist, configService.getMaxIPConcurrentRequests());
@@ -34,7 +44,7 @@ public class AdminController {
     // 从白名单中删除 URL
     @DeleteMapping("/whitelist")
     public String removeFromWhitelist(@RequestParam String url) throws Exception {
-        List<String> whitelist = configService.getWhitelist();
+        List<String> whitelist = new ArrayList<>(configService.getWhitelist());
         if (whitelist.remove(url)) {
             configService.updateConfig(whitelist, configService.getMaxIPConcurrentRequests());
             return "删除成功: " + url;
@@ -69,5 +79,10 @@ public class AdminController {
     public String updatePrivateKey(@RequestParam String privateKey) throws Exception {
         configService.updatePrivateKey(privateKey);  // 更新config.json中的私钥
         return "私钥更新成功";
+    }
+
+    // 验证 URL 的有效性
+    private boolean isValidUrl(String url) {
+        return URL_PATTERN.matcher(url).matches();
     }
 }
