@@ -120,6 +120,24 @@ server.ssl.key-password=$keystore_password
     echo -e "${GREEN}>>> application.properties 配置已更新${NC}"
 }
 
+# 放行端口
+function allow_port() {
+    echo -e "${YELLOW}>>> 放行 8443 端口...${NC}"
+    
+    if command -v ufw &> /dev/null; then
+        # 使用 ufw
+        sudo ufw allow 8443/tcp
+        echo -e "${GREEN}>>> 8443 端口已成功放行。${NC}"
+    elif command -v firewall-cmd &> /dev/null; then
+        # 使用 firewalld
+        sudo firewall-cmd --zone=public --add-port=8443/tcp --permanent
+        sudo firewall-cmd --reload
+        echo -e "${GREEN}>>> 8443 端口已成功放行。${NC}"
+    else
+        echo -e "${RED}>>> 未检测到可用的防火墙工具，请手动放行端口。${NC}"
+    fi
+}
+
 # 使用 Spring Security 的 BCryptPasswordEncoder 来加密密码
 function encrypt_password() {
     password=$1
@@ -268,6 +286,7 @@ function deploy_project() {
     check_installation
     retry_function update_project
     retry_function generate_ssl_certificate  # 生成 SSL 证书并配置 HTTPS
+    retry_function allow_port  # 放行 8443 端口
     retry_function build_project
     find_latest_jar
     setup_service
