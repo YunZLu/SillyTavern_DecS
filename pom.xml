@@ -125,7 +125,7 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>${spring.boot.version}</version>
                 <configuration>
-                    <mainClass>async.AsyncApplication</mainClass> <!-- 指定主类 -->
+                    <mainClass>async.AsyncApplication</mainClass> <!-- 确保主类路径是正确的 -->
                 </configuration>
             </plugin>
 
