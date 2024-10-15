@@ -18,7 +18,7 @@
         <lombok.version>1.18.24</lombok.version>
         <slf4j.version>1.7.36</slf4j.version>
         <reactor.version>3.4.15</reactor.version>
-        <spring.security.version>6.0.0</spring.security.version> <!-- 更新版本 -->
+        <spring.security.version>6.0.0</spring.security.version>
     </properties>
 
     <dependencies>
@@ -124,6 +124,9 @@
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>${spring.boot.version}</version>
+                <configuration>
+                    <mainClass>async.AsyncApplication</mainClass> <!-- 指定主类 -->
+                </configuration>
             </plugin>
 
             <plugin>
