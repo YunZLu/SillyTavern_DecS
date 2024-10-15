@@ -11,7 +11,7 @@ import reactor.core.publisher.Mono;
 
 import javax.annotation.PostConstruct;
 import javax.crypto.Cipher;
-import javax.xml.bind.DatatypeConverter;  // 用于十六进制字符串转字节数组
+import javax.xml.bind.DatatypeConverter; // 用于十六进制字符串转字节数组
 import java.security.PrivateKey;
 import java.util.List;
 import java.util.Map;
@@ -26,14 +26,14 @@ public class AsyncController {
     private static List<String> whitelist; // 改为静态变量
     private static int maxIPConcurrentRequests; // 改为静态变量
 
-    private final WebClient webClient = WebClient.create();  // WebClient用于非阻塞HTTP请求
+    private final WebClient webClient = WebClient.create(); // WebClient用于非阻塞HTTP请求
 
     // 记录每个IP的并发请求数
-    private final Map<String, Integer> ipRequestCount = new ConcurrentHashMap<>();  
+    private final Map<String, Integer> ipRequestCount = new ConcurrentHashMap<>();
 
     // 特定参数映射的目标URL
     private final String claudeUrl = "https://claude-url.com";
-    private final String clewdUrl = "https://clewd-url.com";  // clewd 对应的 URL
+    private final String clewdUrl = "https://clewd-url.com"; // clewd 对应的 URL
 
     private final ConfigService configService;
 
@@ -43,16 +43,13 @@ public class AsyncController {
 
     @PostConstruct
     public void init() throws Exception {
-        configService.loadConfig();  // 加载白名单和并发限制配置
-        reloadConfig();              // 加载私钥
+        reloadConfig(); // 加载配置和私钥
     }
 
     public static void reloadConfig() {
         try {
-            // 重新加载配置
             ConfigService configService = new ConfigService(); // 创建新的ConfigService实例
-            configService.loadConfig();
-            privateKey = configService.getPrivateKeyObject(); // 重新加载私钥
+            privateKey = configService.loadAndGetPrivateKey(); // 直接加载配置并获取私钥
             whitelist = configService.getWhitelist(); // 重新加载白名单
             maxIPConcurrentRequests = configService.getMaxIPConcurrentRequests(); // 重新加载最大同IP并发请求数
             logger.info("配置已重新加载");
@@ -67,7 +64,7 @@ public class AsyncController {
             try {
                 if (privateKey == null) {
                     logger.warn("私钥为 null，无法解密消息");
-                    return encryptedMessage;  // 如果私钥为 null，直接返回原始消息
+                    return encryptedMessage; // 如果私钥为 null，直接返回原始消息
                 }
                 Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
                 cipher.init(Cipher.DECRYPT_MODE, privateKey);
@@ -77,10 +74,10 @@ public class AsyncController {
 
                 // 解密
                 byte[] decryptedMessage = cipher.doFinal(encryptedBytes);
-                return new String(decryptedMessage);  // 返回解密后的字符串
+                return new String(decryptedMessage); // 返回解密后的字符串
             } catch (Exception e) {
                 logger.error("解密消息时发生错误: {}", e.getMessage());
-                return encryptedMessage;  // 如果解密失败，直接返回原始未加密内容
+                return encryptedMessage; // 如果解密失败，直接返回原始未加密内容
             }
         });
     }
@@ -124,7 +121,7 @@ public class AsyncController {
         Flux<DataBuffer> result = Flux.concat(
             requestBodyData.getMessages().stream()
                 .map(message -> decryptMessage(message.getContent()).doOnNext(decryptedContent -> {
-                    message.setContent(decryptedContent);  // 解密成功则更新内容，失败则保留原始内容
+                    message.setContent(decryptedContent); // 解密成功则更新内容，失败则保留原始内容
                 }))
                 .toList()
         ).flatMap(decryptedMessage -> webClient.post()
