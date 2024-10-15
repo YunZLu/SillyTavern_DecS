@@ -32,6 +32,12 @@ public class ConfigService {
         privateKey = (String) config.get("privateKey");
     }
 
+    // 加载配置并返回私钥对象
+    public PrivateKey loadAndGetPrivateKey() throws Exception {
+        loadConfig(); // 加载配置
+        return getPrivateKeyObject(); // 获取私钥对象
+    }
+
     // 更新 config.json 文件中的配置
     public void updateConfig(List<String> whitelist, int maxIPConcurrentRequests) throws Exception {
         this.whitelist = whitelist;
@@ -74,13 +80,13 @@ public class ConfigService {
     private String formatPrivateKey(String privateKey) {
         StringBuilder formattedPrivateKey = new StringBuilder();
         formattedPrivateKey.append("-----BEGIN PRIVATE KEY-----\n");
-        
+
         int length = privateKey.length();
         for (int i = 0; i < length; i += 64) {
             int endIndex = Math.min(i + 64, length);
             formattedPrivateKey.append(privateKey, i, endIndex).append("\n");
         }
-        
+
         formattedPrivateKey.append("-----END PRIVATE KEY-----");
         return formattedPrivateKey.toString();
     }
