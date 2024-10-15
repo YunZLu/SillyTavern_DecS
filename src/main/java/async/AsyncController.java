@@ -22,17 +22,20 @@ public class AsyncController {
 
     private static final Logger logger = LoggerFactory.getLogger(AsyncController.class);
 
-    private PrivateKey privateKey;
+    private static PrivateKey privateKey; // 改为静态变量
+    private static List<String> whitelist; // 改为静态变量
+    private static int maxIPConcurrentRequests; // 改为静态变量
+
     private final WebClient webClient = WebClient.create();  // WebClient用于非阻塞HTTP请求
 
-    // 动态配置服务类
-    private final ConfigService configService;
-
-    private final Map<String, Integer> ipRequestCount = new ConcurrentHashMap<>();  // 记录每个IP的并发请求数
+    // 记录每个IP的并发请求数
+    private final Map<String, Integer> ipRequestCount = new ConcurrentHashMap<>();  
 
     // 特定参数映射的目标URL
     private final String claudeUrl = "https://claude-url.com";
     private final String clewdUrl = "https://clewd-url.com";  // clewd 对应的 URL
+
+    private final ConfigService configService;
 
     public AsyncController(ConfigService configService) {
         this.configService = configService;
@@ -41,15 +44,20 @@ public class AsyncController {
     @PostConstruct
     public void init() throws Exception {
         configService.loadConfig();  // 加载白名单和并发限制配置
-        loadPrivateKey();            // 加载私钥
+        reloadConfig();              // 加载私钥
     }
 
-    private void loadPrivateKey() {
+    public static void reloadConfig() {
         try {
-            this.privateKey = configService.getPrivateKeyObject();  // 从 ConfigService 获取私钥对象
+            // 重新加载配置
+            ConfigService configService = new ConfigService(); // 创建新的ConfigService实例
+            configService.loadConfig();
+            privateKey = configService.getPrivateKeyObject(); // 重新加载私钥
+            whitelist = configService.getWhitelist(); // 重新加载白名单
+            maxIPConcurrentRequests = configService.getMaxIPConcurrentRequests(); // 重新加载最大同IP并发请求数
+            logger.info("配置已重新加载");
         } catch (Exception e) {
-            logger.warn("获取私钥时发生错误: {}，将私钥设置为 null", e.getMessage());
-            this.privateKey = null;  // 如果解码失败，将私钥设置为 null
+            logger.error("重新加载配置时发生错误: {}", e.getMessage());
         }
     }
 
@@ -57,8 +65,6 @@ public class AsyncController {
     public Mono<String> decryptMessage(String encryptedMessage) {
         return Mono.fromSupplier(() -> {
             try {
-                // 每次请求时都重新获取私钥
-                privateKey = configService.getPrivateKeyObject();  // 确保使用最新的私钥
                 if (privateKey == null) {
                     logger.warn("私钥为 null，无法解密消息");
                     return encryptedMessage;  // 如果私钥为 null，直接返回原始消息
@@ -89,10 +95,7 @@ public class AsyncController {
             return Flux.error(new IllegalArgumentException("没有消息需要处理"));
         }
 
-        // 每次请求时都重新获取最大同IP并发请求数
-        int maxIPConcurrentRequests = configService.getMaxIPConcurrentRequests();
-
-        // 检查同IP并发请求限制
+        // 获取最新的最大同IP并发请求数
         int currentRequests = ipRequestCount.getOrDefault(clientIp, 0);
         if (currentRequests >= maxIPConcurrentRequests) {
             return Flux.error(new IllegalArgumentException("来自该IP的并发请求过多"));
@@ -102,9 +105,6 @@ public class AsyncController {
 
         // 处理特殊参数的逻辑
         String targetUrl = resolveTargetUrl(urlOrParam);
-
-        // 每次请求时都重新获取白名单
-        List<String> whitelist = configService.getWhitelist();
 
         // 检查URL是否在白名单中
         if (!whitelist.contains(targetUrl)) {
