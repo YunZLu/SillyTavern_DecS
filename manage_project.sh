@@ -280,17 +280,17 @@ function show_menu() {
     echo -e "${BLUE}╔══════════════════════════════════════════════════╗${NC}"
     echo -e "${BLUE}║               ${GREEN}请选择一个操作${NC}${BLUE}                    ║${NC}"
     echo -e "${BLUE}╠══════════════════════════════════════════════════╣${NC}"
-    echo -e "${BLUE}║${NC} （1）启动/重启服务${BLUE}                              ║${NC}"
+    echo -e "${BLUE}║${NC} （1）启动/重启加密服务${BLUE}                            ║${NC}"
     echo -e "${BLUE}║${NC} （2）更新项目管理脚本${BLUE}                          ║${NC}"
-    echo -e "${BLUE}║${NC} （3）更新项目${BLUE}                                  ║${NC}"
-    echo -e "${BLUE}║${NC} （4）修改登录用户名和密码${BLUE}                      ║${NC}"
+    echo -e "${BLUE}║${NC} （3）更新加密服务${BLUE}                                ║${NC}"
+    echo -e "${BLUE}║${NC} （4）修改管理员用户名和密码${BLUE}                    ║${NC}"
     echo -e "${BLUE}╠══════════════════════════════════════════════════╣${NC}"
     echo -e "${BLUE}║${RED} （0）退出${NC}${BLUE}                                      ║${NC}"
     echo -e "${BLUE}╚══════════════════════════════════════════════════╝${NC}"
     read -rp "$(echo -e "${BLUE}输入你的选择 [0-4]: ${NC}")" choice
     case $choice in
         1)
-            echo -e "${YELLOW}>>> 你选择了启动/重启服务${NC}"
+            echo -e "${YELLOW}>>> 你选择了启动/重启加密服务${NC}"
             retry_function start_or_restart_service
             check_service_status
             ;;
@@ -299,7 +299,7 @@ function show_menu() {
             retry_function update_script
             ;;
         3)
-            echo -e "${YELLOW}>>> 你选择了更新项目${NC}"
+            echo -e "${YELLOW}>>> 你选择了更新加密服务${NC}"
             retry_function update_project
             retry_function build_project
             find_latest_jar
@@ -308,7 +308,7 @@ function show_menu() {
             check_service_status
             ;;
         4)
-            echo -e "${YELLOW}>>> 你选择了修改登录用户名和密码${NC}"
+            echo -e "${YELLOW}>>> 你选择了修改管理员用户名和密码${NC}"
             update_login_credentials
             ;;
         0)
