@@ -33,7 +33,7 @@ public class SecurityConfig {
         http
             .csrf().disable()  // 禁用 CSRF 防护，仅在开发或测试时，生产环境需要启用
             .authorizeHttpRequests()
-                .requestMatchers("/login", "/login.html", "/css/**", "/js/**", "/images/**").permitAll()  // 允许访问这些资源
+                .requestMatchers("/login.html", "/css/**", "/js/**", "/images/**").permitAll()  // 允许访问这些资源
                 .anyRequest().authenticated()  // 其他请求需要认证
             .and()
             .formLogin()
