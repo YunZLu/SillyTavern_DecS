@@ -108,15 +108,11 @@ function configure_application_properties() {
     keystore_password=$1
 
     echo -e "${YELLOW}>>> 配置 application.properties 文件...${NC}"
-    # 写入 SSL 配置到 application.properties
-    echo "
-# HTTPS 配置
-server.port=8443
-server.ssl.key-store=classpath:keystore.jks
-server.ssl.key-store-password=$keystore_password
-server.ssl.key-password=$keystore_password
-" >> "$APPLICATION_PROPERTIES_FILE"
-
+    
+    # 更新 application.properties 文件中的 SSL 配置
+    sed -i "s/server.ssl.key-store-password=.*/server.ssl.key-store-password=$keystore_password/" "$APPLICATION_PROPERTIES_FILE"
+    sed -i "s/server.ssl.key-password=.*/server.ssl.key-password=$keystore_password/" "$APPLICATION_PROPERTIES_FILE"
+    
     echo -e "${GREEN}>>> application.properties 配置已更新${NC}"
 }
 
