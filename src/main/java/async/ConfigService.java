@@ -4,38 +4,40 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.stereotype.Service;
 
-import java.io.File;
-import java.io.FileWriter;
+import java.io.InputStream;
 import java.security.KeyFactory;
 import java.security.PrivateKey;
 import java.security.spec.PKCS8EncodedKeySpec;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
-import java.util.Base64;
 
 @Service
 public class ConfigService {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final String configFilePath = "src/main/resources/config.json";
     private List<String> whitelist;
     private int maxIPConcurrentRequests;
     private String privateKey;
 
     // 加载 config.json 文件中的配置
     public void loadConfig() throws Exception {
-        File configFile = new ClassPathResource("config.json").getFile();
-        Map<String, Object> config = objectMapper.readValue(configFile, Map.class);
+        try (InputStream inputStream = new ClassPathResource("config.json").getInputStream()) {
+            Map<String, Object> config = objectMapper.readValue(inputStream, Map.class);
 
-        whitelist = (List<String>) config.get("whitelist");
-        maxIPConcurrentRequests = (Integer) config.get("maxConcurrentRequestsPerIP");
-        privateKey = (String) config.get("privateKey");
+            whitelist = (List<String>) config.get("whitelist");
+            maxIPConcurrentRequests = (Integer) config.get("maxConcurrentRequestsPerIP");
+            privateKey = (String) config.get("privateKey");
+        } catch (Exception e) {
+            System.err.println("加载配置文件时发生错误: " + e.getMessage());
+            throw e;  // 重新抛出异常以便调用方处理
+        }
     }
 
     // 加载配置并返回私钥对象
     public PrivateKey loadAndGetPrivateKey() throws Exception {
-        loadConfig(); // 加载配置
-        return getPrivateKeyObject(); // 获取私钥对象
+        loadConfig();  // 加载配置
+        return getPrivateKeyObject();  // 获取私钥对象
     }
 
     // 获取私钥对象
@@ -46,38 +48,11 @@ public class ConfigService {
             KeyFactory keyFactory = KeyFactory.getInstance("RSA");
             return keyFactory.generatePrivate(spec);
         } catch (IllegalArgumentException e) {
-            // 记录私钥无效的错误
             System.err.println("私钥无效，无法解码: " + e.getMessage());
-            return null; // 返回 null 而不是抛出异常
+            return null;
         } catch (Exception e) {
-            // 记录其他加载私钥时发生的错误
             System.err.println("加载私钥时发生错误: " + e.getMessage());
-            return null; // 返回 null 而不是抛出异常
-        }
-    }
-
-    // 更新 config.json 文件中的配置
-    public void updateConfig(List<String> whitelist, int maxIPConcurrentRequests) throws Exception {
-        this.whitelist = whitelist;
-        this.maxIPConcurrentRequests = maxIPConcurrentRequests;
-        saveConfig();
-    }
-
-    // 更新私钥并保存到 config.json 文件
-    public void updatePrivateKey(String privateKey) throws Exception {
-        this.privateKey = privateKey.replaceAll("\\n", "");
-        saveConfig();
-    }
-
-    // 保存配置到 config.json
-    private void saveConfig() throws Exception {
-        Map<String, Object> config = Map.of(
-            "whitelist", whitelist,
-            "maxConcurrentRequestsPerIP", maxIPConcurrentRequests,
-            "privateKey", privateKey
-        );
-        try (FileWriter writer = new FileWriter(configFilePath)) {
-            objectMapper.writeValue(writer, config);
+            return null;
         }
     }
 
