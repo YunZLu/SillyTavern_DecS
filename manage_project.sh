@@ -5,9 +5,9 @@ GITHUB_REPO_URL="https://github.com/YunZLu/SillyTavern_DecS.git"
 PROJECT_NAME="SillyTavern_DecS"
 APP_NAME="sillytavern-decs-app"
 SERVICE_FILE="/etc/systemd/system/$APP_NAME.service"
-SECURITY_CONFIG_FILE="$PROJECT_NAME/src/main/java/async/SecurityConfig.java"
-KEYSTORE_FILE="$PROJECT_NAME/src/main/resources/keystore.jks"
-APPLICATION_PROPERTIES_FILE="$PROJECT_NAME/src/main/resources/application.properties"
+SECURITY_CONFIG_FILE="src/main/java/async/SecurityConfig.java"
+KEYSTORE_FILE="src/main/resources/keystore.jks"
+APPLICATION_PROPERTIES_FILE="src/main/resources/application.properties"
 SCRIPT_URL="https://raw.githubusercontent.com/YunZLu/SillyTavern_DecS/refs/heads/main/manage_project.sh"
 
 GREEN='\033[0;32m'
