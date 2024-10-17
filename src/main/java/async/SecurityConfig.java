@@ -22,8 +22,8 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .authorizeRequests()
-                .antMatchers("/login.html", "/").permitAll() // 允许所有用户访问登录页面
-                .antMatchers("/admin/**").authenticated() // 保护 /admin/** 路径
+                .requestMatchers("/login.html", "/").permitAll() // 允许所有用户访问登录页面
+                .requestMatchers("/admin/**").authenticated() // 保护 /admin/** 路径
                 .and()
             .formLogin()
                 .loginPage("/login.html") // 指定登录页面
