@@ -15,7 +15,15 @@ public class CsrfController {
     public Map<String, String> getCsrfToken(HttpServletRequest request) {
         CsrfToken csrfToken = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
         Map<String, String> tokenMap = new HashMap<>();
-        tokenMap.put("token", csrfToken.getToken());
+        
+        if (csrfToken != null) {
+            tokenMap.put("token", csrfToken.getToken());
+        } else {
+            // 返回适当的错误响应或抛出异常
+            throw new IllegalStateException("CSRF token not found");
+        }
+        
         return tokenMap;
     }
 }
+
