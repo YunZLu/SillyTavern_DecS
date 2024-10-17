@@ -188,6 +188,18 @@
     </style>
 
     <script>
+        // CSRF 令牌变量
+        let csrfToken = '';
+
+        // 获取 CSRF 令牌
+        function getCsrfToken() {
+            fetch('/csrf-token')
+                .then(response => response.json())
+                .then(data => {
+                    csrfToken = data.token;
+                });
+        }
+
         // 获取白名单并更新表格
         function getWhitelist() {
             fetch('/admin/whitelist')
@@ -212,23 +224,33 @@
                 alert('请输入 URL');
                 return;
             }
-            fetch(`/admin/whitelist?url=${url}`, { method: 'POST' })
-                .then(response => response.text())
-                .then(data => {
-                    alert(data);
-                    document.getElementById('whitelistInput').value = '';  // 清空输入框
-                    getWhitelist();  // 更新白名单表格
-                });
+            fetch(`/admin/whitelist?url=${url}`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken  // 传递 CSRF 令牌
+                }
+            })
+            .then(response => response.text())
+            .then(data => {
+                alert(data);
+                document.getElementById('whitelistInput').value = '';  // 清空输入框
+                getWhitelist();  // 更新白名单表格
+            });
         }
 
         // 从白名单中删除 URL
         function removeFromWhitelist(url) {
-            fetch(`/admin/whitelist?url=${url}`, { method: 'DELETE' })
-                .then(response => response.text())
-                .then(data => {
-                    alert(data);
-                    getWhitelist();  // 更新白名单表格
-                });
+            fetch(`/admin/whitelist?url=${url}`, {
+                method: 'DELETE',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken  // 传递 CSRF 令牌
+                }
+            })
+            .then(response => response.text())
+            .then(data => {
+                alert(data);
+                getWhitelist();  // 更新白名单表格
+            });
         }
 
         // 获取当前并发限制
@@ -247,12 +269,17 @@
                 alert('并发限制必须大于 0');
                 return;
             }
-            fetch(`/admin/concurrent-limit?limit=${limit}`, { method: 'POST' })
-                .then(response => response.text())
-                .then(data => {
-                    alert(data);
-                    window.location.reload();  // 设置完成后刷新页面
-                });
+            fetch(`/admin/concurrent-limit?limit=${limit}`, {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken  // 传递 CSRF 令牌
+                }
+            })
+            .then(response => response.text())
+            .then(data => {
+                alert(data);
+                window.location.reload();  // 设置完成后刷新页面
+            });
         }
 
         // 获取私钥
@@ -273,14 +300,17 @@
             }
             fetch(`/admin/private-key`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'X-CSRF-TOKEN': csrfToken  // 传递 CSRF 令牌
+                },
                 body: new URLSearchParams({ privateKey: privateKey })
             })
-                .then(response => response.text())
-                .then(data => {
-                    alert(data);
-                    window.location.reload();  // 更新私钥后刷新页面
-                });
+            .then(response => response.text())
+            .then(data => {
+                alert(data);
+                window.location.reload();  // 更新私钥后刷新页面
+            });
         }
 
         // 页面加载时获取数据
@@ -288,6 +318,7 @@
             getWhitelist();
             getConcurrentLimit();
             getPrivateKey();
+            getCsrfToken();  // 获取 CSRF 令牌
         };
     </script>
 </head>
