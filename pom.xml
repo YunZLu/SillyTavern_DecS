@@ -110,6 +110,14 @@
             <artifactId>jakarta.xml.bind-api</artifactId>
             <version>2.3.3</version>
         </dependency>
+
+        <!-- 添加 Servlet API 依赖 -->
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+            <version>4.0.1</version> <!-- 选择合适的版本 -->
+            <scope>provided</scope>
+        </dependency>
     </dependencies>
 
     <build>
