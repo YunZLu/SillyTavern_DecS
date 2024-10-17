@@ -97,10 +97,20 @@
 <script>
     // 使用 JavaScript 获取 CSRF 令牌并插入到隐藏的输入字段中
     fetch('/csrf-token')
-        .then(response => response.json())
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
         .then(data => {
             document.getElementById('csrfToken').value = data.token;
+            console.log('CSRF Token:', data.token); // 确认 CSRF 令牌值
+        })
+        .catch(error => {
+            console.error('There was a problem with the fetch operation:', error);
         });
+
 
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('error')) {
