@@ -81,8 +81,9 @@
 
 <div class="container">
     <h2>登录</h2>
-    <form method="POST" action="https://46.8.227.76:8443/login">
-        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+    <form method="POST" action="/login">
+        <!-- CSRF 令牌通过 JavaScript 动态获取 -->
+        <input type="hidden" name="_csrf" id="csrfToken" value="" />
         <input type="text" id="username" name="username" class="form-control" placeholder="请输入用户名" required>
         <input type="password" id="password" name="password" class="form-control" placeholder="请输入密码" required>
         <button type="submit" class="btn btn-custom">登录</button>
@@ -94,6 +95,13 @@
 </div>
 
 <script>
+    // 使用 JavaScript 获取 CSRF 令牌并插入到隐藏的输入字段中
+    fetch('/csrf-token')
+        .then(response => response.json())
+        .then(data => {
+            document.getElementById('csrfToken').value = data.token;
+        });
+
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.get('error')) {
         document.getElementById('errorMessage').classList.remove('d-none');
