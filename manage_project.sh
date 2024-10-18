@@ -98,7 +98,7 @@ function build_project() {
 
 # 找到最新的 JAR 文件
 function find_latest_jar() {
-    JAR_FILE=$(find $PROJECT_NAME/target -name "*.jar" | head -n 1)
+    JAR_FILE=$(find target -name "*.jar" | head -n 1)
     echo -e "${GREEN}>>> 找到的 JAR 文件: $JAR_FILE${NC}"
 }
 
