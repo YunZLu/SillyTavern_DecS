@@ -336,7 +336,7 @@ function show_menu() {
     echo -e "${BLUE}║${NC} （4）设置同IP并发限制${BLUE}                         ║${NC}"
     echo -e "${BLUE}║${NC} （5）设置私钥${BLUE}                                ║${NC}"
     echo -e "${BLUE}║${NC} （6）更新项目管理脚本${BLUE}                          ║${NC}"
-    echo -e "${BLUE}║${NC} （7）更新服务${BLUE}                                 ║${NC}"
+    echo -e "${BLUE}║${NC} （7）安装/更新服务${BLUE}                                 ║${NC}"
     echo -e "${BLUE}║${NC} （8）完全卸载服务${BLUE}                             ║${NC}"
     echo -e "${BLUE}╠══════════════════════════════════════════════════╣${NC}"
     echo -e "${BLUE}║${RED} （0）退出${NC}${BLUE}                                      ║${NC}"
