@@ -1,5 +1,8 @@
 package async;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpHeaders;
@@ -11,79 +14,164 @@ import reactor.core.publisher.Mono;
 
 import javax.annotation.PostConstruct;
 import javax.crypto.Cipher;
-import javax.xml.bind.DatatypeConverter; // 用于十六进制字符串转字节数组
+import javax.xml.bind.DatatypeConverter;
+import java.io.File;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.*;
+import java.security.KeyFactory;
+import java.security.MessageDigest;
 import java.security.PrivateKey;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 
-@RequestMapping("/async")
 @RestController
 public class AsyncController {
 
     private static final Logger logger = LoggerFactory.getLogger(AsyncController.class);
 
-    private static PrivateKey privateKey; // 改为静态变量
-    private static List<String> whitelist; // 改为静态变量
-    private static int maxIPConcurrentRequests; // 改为静态变量
+    // 常量定义
+    private static final String DEFAULT_CONFIG_PATH = "src/main/resources/config.json";
+    private static final String ENCRYPTION_PREFIX = "ENC:";
+    private static final String ENCRYPTION_ALGORITHM = "RSA/ECB/OAEPWithSHA-256AndMGF1Padding";
 
-    private final WebClient webClient = WebClient.create(); // WebClient用于非阻塞HTTP请求
+    private static PrivateKey privateKey; // 私钥
+    private static List<String> whitelist; // 白名单
+    private static int maxIPConcurrentRequests; // 最大同IP并发请求数
 
-    // 记录每个IP的并发请求数
-    private final Map<String, Integer> ipRequestCount = new ConcurrentHashMap<>();
+    private final WebClient webClient = WebClient.create(); // 用于非阻塞HTTP请求
+    private final Map<String, AtomicInteger> ipRequestCount = new ConcurrentHashMap<>(); // 记录每个IP的并发请求数
 
-    // 特定参数映射的目标URL
+    // 定义一个有限大小的LRU缓存，缓存解密过的数据，避免重复解密
+    private final Cache<String, String> decryptionCache = CacheBuilder.newBuilder()
+            .maximumSize(1000) // 最大缓存大小
+            .expireAfterWrite(10, TimeUnit.MINUTES) // 缓存过期时间为10分钟
+            .build();
+
     private final String claudeUrl = "https://claude-url.com";
-    private final String clewdUrl = "https://clewd-url.com"; // clewd 对应的 URL
+    private final String clewdUrl = "https://clewd-url.com"; // clewd对应的URL
 
-    private final ConfigService configService;
-
-    public AsyncController(ConfigService configService) {
-        this.configService = configService;
-    }
+    private File configFilePath;  // 配置文件路径
 
     @PostConstruct
-    public void init() throws Exception {
-        reloadConfig(); // 加载配置和私钥
+    public void init() {
+        configFilePath = getConfigFile(); // 获取外部或内部配置文件路径
+        reloadConfig(); // 从config.json加载配置
+        startWatchService(); // 启动WatchService监控config.json文件变化
     }
 
-    public static void reloadConfig() {
+    // 从外部或默认路径获取配置文件
+    private File getConfigFile() {
+        String configPath = System.getenv("CONFIG_JSON_PATH");
+        if (configPath == null || configPath.isEmpty()) {
+            configPath = System.getProperty("config.json.path", DEFAULT_CONFIG_PATH);
+        }
+        File config = new File(configPath);
+        if (!config.exists() || !config.isFile()) {
+            throw new IllegalStateException("配置文件不存在或无效: " + configPath);
+        }
+        logger.info("加载配置文件: {}", config.getAbsolutePath());
+        return config;
+    }
+
+    // 启动WatchService，监听config.json文件的变化
+    private void startWatchService() {
         try {
-            ConfigService configService = new ConfigService(); // 创建新的ConfigService实例
-            privateKey = configService.loadAndGetPrivateKey(); // 直接加载配置并获取私钥
-            whitelist = configService.getWhitelist(); // 重新加载白名单
-            maxIPConcurrentRequests = configService.getMaxIPConcurrentRequests(); // 重新加载最大同IP并发请求数
-            logger.info("配置已重新加载");
-        } catch (Exception e) {
-            logger.error("重新加载配置时发生错误: {}", e.getMessage());
+            WatchService watchService = FileSystems.getDefault().newWatchService();
+            Path configDir = configFilePath.getParentFile().toPath();
+            configDir.register(watchService, StandardWatchEventKinds.ENTRY_MODIFY);
+
+            new Thread(() -> {
+                while (true) {
+                    try {
+                        WatchKey key = watchService.take();
+                        for (WatchEvent<?> event : key.pollEvents()) {
+                            if (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY && configFilePath.getName().equals(event.context().toString())) {
+                                logger.info("检测到 config.json 文件更新，重新加载配置");
+                                reloadConfig();
+                            }
+                        }
+                        key.reset();
+                    } catch (Exception e) {
+                        logger.error("文件监控发生错误: {}", e.getMessage());
+                    }
+                }
+            }).start();
+        } catch (IOException e) {
+            logger.error("启动WatchService失败: {}", e.getMessage());
         }
     }
 
-    // 修改解密消息的方法，直接处理十六进制字符串转字节数组
-    public Mono<String> decryptMessage(String encryptedMessage) {
-        return Mono.fromSupplier(() -> {
-            try {
-                if (privateKey == null) {
-                    logger.warn("私钥为 null，无法解密消息");
-                    return encryptedMessage; // 如果私钥为 null，直接返回原始消息
-                }
-                Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");
-                cipher.init(Cipher.DECRYPT_MODE, privateKey);
+    // 重新加载配置，并仅在私钥更改时清空缓存
+    public void reloadConfig() {
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+            Map<String, Object> config = objectMapper.readValue(configFilePath, Map.class);
 
-                // 将十六进制字符串转换为字节数组
-                byte[] encryptedBytes = DatatypeConverter.parseHexBinary(encryptedMessage);
+            // 加载新私钥
+            String privateKeyString = (String) config.get("privateKey");
+            byte[] keyBytes = Base64.getDecoder().decode(privateKeyString);
+            PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
+            KeyFactory kf = KeyFactory.getInstance("RSA");
+            PrivateKey newPrivateKey = kf.generatePrivate(spec);
 
-                // 解密
-                byte[] decryptedMessage = cipher.doFinal(encryptedBytes);
-                return new String(decryptedMessage); // 返回解密后的字符串
-            } catch (Exception e) {
-                logger.error("解密消息时发生错误: {}", e.getMessage());
-                return encryptedMessage; // 如果解密失败，直接返回原始未加密内容
+            // 仅在私钥变化时清空缓存
+            if (!newPrivateKey.equals(privateKey)) {
+                privateKey = newPrivateKey;
+                decryptionCache.invalidateAll(); // 私钥变化，清空缓存
+                logger.info("私钥已更改，缓存已清空");
             }
-        });
+
+            // 更新其他配置
+            whitelist = (List<String>) config.get("whitelist");
+            maxIPConcurrentRequests = (int) config.get("maxConcurrentRequestsPerIP");
+
+            logger.info("配置已成功从 config.json 文件加载");
+        } catch (IOException e) {
+            logger.error("加载 config.json 文件时发生错误，将继续使用上次的配置: {}", e.getMessage());
+        }
     }
 
-    // 捕获请求，异步解密消息，并保持顺序
+    // 生成加密消息的哈希值
+    private String getHash(String message) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(message.getBytes(StandardCharsets.UTF_8));
+            return Base64.getEncoder().encodeToString(hash);
+        } catch (Exception e) {
+            logger.error("生成哈希值时发生错误: {}", e.getMessage());
+            return message; // 返回原始消息作为回退
+        }
+    }
+
+    // 判断是否需要解密，根据前缀 "ENC:" 判断是否加密
+    private boolean isEncrypted(String content) {
+        return content.startsWith(ENCRYPTION_PREFIX);
+    }
+
+    // 解密消息，首先检查缓存，如果没有缓存则解密并存入缓存
+    private String decryptAndCache(String encryptedMessage) {
+        String hashKey = getHash(encryptedMessage);
+        try {
+            return decryptionCache.get(hashKey, () -> {
+                Cipher cipher = Cipher.getInstance(ENCRYPTION_ALGORITHM);
+                cipher.init(Cipher.DECRYPT_MODE, privateKey);
+
+                byte[] encryptedBytes = DatatypeConverter.parseHexBinary(encryptedMessage.substring(ENCRYPTION_PREFIX.length())); // 移除前缀
+                byte[] decryptedMessage = cipher.doFinal(encryptedBytes);
+                return new String(decryptedMessage);
+            });
+        } catch (Exception e) {
+            logger.error("解密消息时发生错误: {}", e.getMessage());
+            return encryptedMessage; // 解密失败时返回原始消息
+        }
+    }
+
     @PostMapping("/{urlOrParam}")
     public Flux<DataBuffer> captureAndForward(@PathVariable String urlOrParam,
                                               @RequestBody RequestBodyData requestBodyData,
@@ -93,64 +181,53 @@ public class AsyncController {
             return Flux.error(new IllegalArgumentException("没有消息需要处理"));
         }
 
-        // 获取最新的最大同IP并发请求数
-        int currentRequests = ipRequestCount.getOrDefault(clientIp, 0);
-        if (currentRequests >= maxIPConcurrentRequests) {
+        AtomicInteger currentRequests = ipRequestCount.computeIfAbsent(clientIp, k -> new AtomicInteger(0));
+        if (currentRequests.incrementAndGet() > maxIPConcurrentRequests) {
+            currentRequests.decrementAndGet(); // 减少并发数
             return Flux.error(new IllegalArgumentException("来自该IP的并发请求过多"));
         }
 
-        ipRequestCount.put(clientIp, currentRequests + 1);
-
-        // 处理特殊参数的逻辑
         String targetUrl = resolveTargetUrl(urlOrParam);
-
-        // 检查URL是否在白名单中
         if (!whitelist.contains(targetUrl)) {
-            ipRequestCount.put(clientIp, ipRequestCount.get(clientIp) - 1);
+            currentRequests.decrementAndGet();
             return Flux.error(new IllegalArgumentException("URL不在白名单中"));
         }
 
-        // 过滤掉不必要的头信息
         HttpHeaders filteredHeaders = filterHeaders(headers);
-
-        // 日志：打印转发的URL、请求头和请求数据
         logger.info("转发到目标URL: {}", targetUrl);
-        logger.debug("转发的请求头: {}", filteredHeaders);
         logger.debug("转发的请求数据: {}", requestBodyData);
 
-        // 使用 Flux.concat() 保证解密顺序
-        Flux<DataBuffer> result = Flux.concat(
-            requestBodyData.getMessages().stream()
-                .map(message -> decryptMessage(message.getContent()).doOnNext(decryptedContent -> {
-                    message.setContent(decryptedContent); // 解密成功则更新内容，失败则保留原始内容
-                }))
-                .toList()
-        ).flatMap(decryptedMessage -> webClient.post()
+        return Flux.fromIterable(requestBodyData.getMessages())
+            .flatMap(message -> {
+                try {
+                    // 仅在消息以 "ENC:" 开头时才尝试解密
+                    if (isEncrypted(message.getContent())) {
+                        String decryptedContent = decryptAndCache(message.getContent());
+                        message.setContent(decryptedContent);
+                    }
+                    return Mono.just(message);  // 返回已修改或未修改的消息
+                } catch (Exception e) {
+                    logger.error("解密消息时发生错误: {}", e.getMessage());
+                    return Mono.error(e);
+                }
+            })
+            .thenMany(webClient.post()
                 .uri(targetUrl)
                 .headers(httpHeaders -> httpHeaders.addAll(filteredHeaders))
-                .bodyValue(requestBodyData)
+                .bodyValue(requestBodyData)  // 将更新后的 message 发送出去
                 .retrieve()
-                .bodyToFlux(DataBuffer.class));
-
-        return result
-            .doFinally(signalType -> {
-                // 请求完成后，减少当前IP的并发请求数
-                ipRequestCount.put(clientIp, ipRequestCount.get(clientIp) - 1);
-            });
+                .bodyToFlux(DataBuffer.class))
+            .doFinally(signalType -> currentRequests.decrementAndGet());
     }
 
-    // 提取目标 URL 处理的逻辑
     private String resolveTargetUrl(String urlOrParam) {
-        if (urlOrParam.equalsIgnoreCase("claude")) {
-            return claudeUrl;
-        } else if (urlOrParam.equalsIgnoreCase("clewd")) {
-            return clewdUrl;
-        } else {
-            return urlOrParam.startsWith("http") ? urlOrParam : "https://" + urlOrParam;
-        }
+        return switch (urlOrParam.toLowerCase()) {
+            case "claude" -> claudeUrl;
+            case "clewd" -> clewdUrl;
+            default -> urlOrParam.startsWith("http") ? urlOrParam : "https://" + urlOrParam;
+        };
     }
 
-    // 过滤不必要的请求头
     private HttpHeaders filterHeaders(HttpHeaders headers) {
         HttpHeaders filteredHeaders = new HttpHeaders();
         headers.forEach((key, value) -> {
