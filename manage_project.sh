@@ -116,6 +116,17 @@ function move_config_and_set_env() {
     fi
 }
 
+# 设置同IP并发限制
+function set_concurrent_requests() {
+    local current_limit
+    current_limit=$(jq -r '.maxConcurrentRequestsPerIP' "$CONFIG_PATH")
+    
+    echo -e "${YELLOW}当前同IP并发请求限制: $current_limit${NC}"
+    read -rp "请输入新的同IP并发请求限制: " new_limit
+    jq '.maxConcurrentRequestsPerIP = '"$new_limit" "$CONFIG_PATH" > tmp.$$.json && mv tmp.$$.json "$CONFIG_PATH"
+    echo -e "${GREEN}同IP并发请求限制已更新！${NC}"
+}
+
 # 修改私钥
 function set_private_key() {
     local current_private_key
