@@ -6,6 +6,7 @@ PROJECT_NAME="SillyTavern_DecS"
 APP_NAME="sillytavern-decs-app"
 SERVICE_FILE="/etc/systemd/system/$APP_NAME.service"
 SCRIPT_URL="https://raw.githubusercontent.com/YunZLu/SillyTavern_DecS/refs/heads/main/manage_project.sh"
+CONFIG_PATH="/etc/$APP_NAME/config.json"
 
 # 更改默认的服务端口，避免使用常用的 8080 端口
 DEFAULT_PORT=8445
@@ -48,15 +49,16 @@ function update_system() {
 
 # 安装依赖
 function install_dependencies() {
-    echo -e "${YELLOW}>>> 安装依赖: Git, openjdk-17-jdk, Maven, curl, ufw...${NC}"
-    sudo apt-get install -y git openjdk-17-jdk maven curl ufw
+    echo -e "${YELLOW}>>> 安装依赖: Git, openjdk-17-jdk, Maven, curl, ufw, jq...${NC}"
+    sudo apt-get install -y git openjdk-17-jdk maven curl ufw jq
 }
 
 # 验证安装
 function check_installation() {
-    echo -e "${YELLOW}>>> 验证 Java 和 Maven 安装...${NC}"
+    echo -e "${YELLOW}>>> 验证 Java, Maven 和 jq 安装...${NC}"
     java -version
     mvn -version
+    jq --version
 }
 
 # 放行端口
@@ -75,6 +77,122 @@ function allow_port() {
     else
         echo -e "${RED}>>> 未检测到可用的防火墙工具，请手动放行端口。${NC}"
     fi
+}
+
+# 检查是否已部署
+function is_deployed() {
+    if [ -f "$SERVICE_FILE" ] && [ -n "$(find $PROJECT_NAME/target -name '*.jar')" ]; then
+        return 0  # 已部署
+    else
+        return 1  # 未部署
+    fi
+}
+
+# 白名单设置页面
+function whitelist_menu() {
+    echo -e "${BLUE}╔══════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║               ${GREEN}设置白名单${NC}${BLUE}                        ║${NC}"
+    echo -e "${BLUE}╠══════════════════════════════════════════════════╣${NC}"
+    echo -e "${BLUE}║${NC} （1）查看白名单${BLUE}                                  ║${NC}"
+    echo -e "${BLUE}║${NC} （2）增加白名单${BLUE}                                  ║${NC}"
+    echo -e "${BLUE}║${NC} （3）删除白名单${BLUE}                                  ║${NC}"
+    echo -e "${BLUE}║${NC} （4）修改白名单${BLUE}                                  ║${NC}"
+    echo -e "${BLUE}╠══════════════════════════════════════════════════╣${NC}"
+    echo -e "${BLUE}║${NC} （0）返回主菜单${BLUE}                                  ║${NC}"
+    echo -e "${BLUE}╚══════════════════════════════════════════════════╝${NC}"
+    read -rp "$(echo -e "${BLUE}请输入你的选择 [0-4]: ${NC}")" whitelist_choice
+
+    case $whitelist_choice in
+        1)
+            view_whitelist
+            ;;
+        2)
+            add_whitelist
+            ;;
+        3)
+            delete_whitelist
+            ;;
+        4)
+            modify_whitelist
+            ;;
+        0)
+            show_menu
+            ;;
+        *)
+            echo -e "${RED}无效的选择${NC}"
+            ;;
+    esac
+}
+
+# 查看白名单
+function view_whitelist() {
+    local whitelist
+    whitelist=$(jq -r '.whitelist[]' "$CONFIG_PATH")
+    echo -e "${GREEN}当前白名单: ${NC}"
+    echo "$whitelist" | nl  # 使用 nl 命令为白名单项编号
+}
+
+# 增加白名单
+function add_whitelist() {
+    read -rp "请输入要增加的白名单 URL: " new_entry
+    jq '.whitelist += ["'"$new_entry"'"]' "$CONFIG_PATH" > tmp.$$.json && mv tmp.$$.json "$CONFIG_PATH"
+    echo -e "${GREEN}白名单已增加: $new_entry${NC}"
+}
+
+# 删除白名单
+function delete_whitelist() {
+    view_whitelist
+    read -rp "请输入要删除的白名单项编号: " number
+    jq '.whitelist |= del(.[('"$number"'-1)])' "$CONFIG_PATH" > tmp.$$.json && mv tmp.$$.json "$CONFIG_PATH"
+    echo -e "${GREEN}白名单项已删除${NC}"
+}
+
+# 修改白名单
+function modify_whitelist() {
+    view_whitelist
+    read -rp "请输入要修改的白名单项编号: " number
+    read -rp "请输入新的白名单 URL: " new_entry
+    jq '.whitelist['"$number"'-1] = "'"$new_entry"'"' "$CONFIG_PATH" > tmp.$$.json && mv tmp.$$.json "$CONFIG_PATH"
+    echo -e "${GREEN}白名单已修改为: $new_entry${NC}"
+}
+
+# 修改同IP并发限制
+function set_concurrent_requests() {
+    local current_limit
+    current_limit=$(jq -r '.maxConcurrentRequestsPerIP' "$CONFIG_PATH")
+    
+    echo -e "${YELLOW}当前同IP并发请求限制: $current_limit${NC}"
+    read -rp "请输入新的同IP并发请求限制: " new_limit
+    jq '.maxConcurrentRequestsPerIP = '"$new_limit" "$CONFIG_PATH" > tmp.$$.json && mv tmp.$$.json "$CONFIG_PATH"
+    echo -e "${GREEN}同IP并发请求限制已更新！${NC}"
+}
+
+# 修改私钥
+function set_private_key() {
+    local current_private_key
+    current_private_key=$(jq -r '.privateKey' "$CONFIG_PATH")
+    
+    echo -e "${YELLOW}当前私钥: ${current_private_key:0:30}...(已隐藏)${NC}"
+    echo -e "${YELLOW}请输入新的私钥内容（多行输入，按 Ctrl+D 完成输入）:${NC}"
+    private_key=$(</dev/stdin)  # 捕获多行输入的私钥
+    private_key=$(echo "$private_key" | tr -d '\n' | sed 's/ //g')  # 删除换行符和空格
+    jq '.privateKey = "'"$private_key"'"' "$CONFIG_PATH" > tmp.$$.json && mv tmp.$$.json "$CONFIG_PATH"
+    echo -e "${GREEN}私钥已更新！${NC}"
+}
+
+# 启动或重启服务
+function start_or_restart_service() {
+    echo -e "${YELLOW}>>> 启动或重启 Spring Boot 应用服务...${NC}"
+    sudo systemctl daemon-reload
+    sudo systemctl restart "$APP_NAME"
+    sudo systemctl enable "$APP_NAME"
+    echo -e "${GREEN}>>> 服务已启动/重启成功！${NC}"
+}
+
+# 查看服务日志
+function view_service_logs() {
+    echo -e "${YELLOW}>>> 查看服务日志...${NC}"
+    sudo journalctl -u "$APP_NAME" -f
 }
 
 # 克隆或更新项目
@@ -102,109 +220,20 @@ function find_latest_jar() {
     echo -e "${GREEN}>>> 找到的 JAR 文件: $JAR_FILE${NC}"
 }
 
-# 创建/更新 systemd 服务文件
-function setup_service() {
-    if [ ! -f "$SERVICE_FILE" ];then
-        echo -e "${YELLOW}>>> 创建 systemd 服务文件...${NC}"
-        sudo bash -c 'cat <<EOF > '"$SERVICE_FILE"'
-[Unit]
-Description=Spring Boot Application for '"$PROJECT_NAME"'
-After=network.target
-
-[Service]
-User=root
-WorkingDirectory=/root/'"$PROJECT_NAME"'
-ExecStart=/usr/bin/java -jar /root/'"$PROJECT_NAME"'/'"$JAR_FILE"' --server.port='"$DEFAULT_PORT"' > /var/log/'"$APP_NAME"'.log 2>&1
-SuccessExitStatus=143
-TimeoutStopSec=10
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-EOF'
-    else
-        echo -e "${GREEN}>>> systemd 服务文件已存在，跳过创建步骤...${NC}"
-    fi
-}
-
-# 启动或重启服务
-function start_or_restart_service() {
-    echo -e "${YELLOW}>>> 启动或重启 Spring Boot 应用服务...${NC}"
-    sudo systemctl daemon-reload
-    sudo systemctl restart "$APP_NAME"
-    sudo systemctl enable "$APP_NAME"
-    echo -e "${GREEN}>>> 服务已启动/重启成功！${NC}"
-}
-
-# 检查服务状态
-function check_service_status() {
-    echo -e "${YELLOW}>>> 检查服务状态...${NC}"
-    sudo systemctl status "$APP_NAME"
-}
-
-# 查看服务后台日志
-function view_service_logs() {
-    echo -e "${YELLOW}>>> 查看服务日志...${NC}"
-    sudo journalctl -u "$APP_NAME" -f
-}
-
-# 完全卸载服务
-function uninstall_service() {
-    echo -e "${YELLOW}>>> 正在停止服务...${NC}"
-    sudo systemctl stop "$APP_NAME"
-    
-    echo -e "${YELLOW}>>> 正在禁用服务...${NC}"
-    sudo systemctl disable "$APP_NAME"
-
-    echo -e "${YELLOW}>>> 删除 systemd 服务文件...${NC}"
-    sudo rm -f "$SERVICE_FILE"
-    
-    echo -e "${YELLOW}>>> 删除项目文件...${NC}"
-    sudo rm -rf "/root/$PROJECT_NAME"
-
-    echo -e "${GREEN}>>> 服务已完全卸载。${NC}"
-}
-
-# 更新脚本并安全覆盖旧脚本
+# 更新脚本
 function update_script() {
     echo -e "${YELLOW}>>> 正在检查脚本更新...${NC}"
-    TEMP_SCRIPT=$(mktemp)  # 使用临时文件存放新脚本
-    curl -o "$TEMP_SCRIPT" "$SCRIPT_URL"  # 下载新脚本到临时文件
+    TEMP_SCRIPT=$(mktemp)  
+    curl -o "$TEMP_SCRIPT" "$SCRIPT_URL"  
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}>>> 脚本已更新成功，正在重启脚本...${NC}"
         chmod +x "$TEMP_SCRIPT"
-        mv "$TEMP_SCRIPT" "$0"  # 用新脚本覆盖当前脚本
-        exec "$0"  # 重新执行新脚本
+        mv "$TEMP_SCRIPT" "$0" 
+        exec "$0"  
     else
         echo -e "${RED}>>> 脚本更新失败，保留原脚本。请检查网络连接。${NC}"
-        rm -f "$TEMP_SCRIPT"  # 删除临时文件
+        rm -f "$TEMP_SCRIPT"
     fi
-}
-
-# 检查是否已部署
-function is_deployed() {
-    # 检查是否有构建好的 JAR 文件和 systemd 服务文件
-    if [ -f "$SERVICE_FILE" ] && [ -n "$(find $PROJECT_NAME/target -name '*.jar')" ]; then
-        return 0  # 已部署
-    else
-        return 1  # 未部署
-    fi
-}
-
-# 执行初次部署流程
-function deploy_project() {
-    retry_function update_system
-    retry_function install_dependencies
-    check_installation
-    retry_function update_project
-    retry_function allow_port  # 放行 $DEFAULT_PORT 端口
-    retry_function build_project
-    find_latest_jar
-    setup_service
-    start_or_restart_service
-    check_service_status
-    echo -e "${GREEN}>>> 初次部署完成。${NC}"
 }
 
 # 显示菜单并获取用户选择
@@ -213,47 +242,57 @@ function show_menu() {
     echo -e "${BLUE}║               ${GREEN}请选择一个操作${NC}${BLUE}                    ║${NC}"
     echo -e "${BLUE}╠══════════════════════════════════════════════════╣${NC}"
     echo -e "${BLUE}║${NC} （1）启动/重启服务${BLUE}                             ║${NC}"
-    echo -e "${BLUE}║${NC} （2）更新项目管理脚本${BLUE}                          ║${NC}"
-    echo -e "${BLUE}║${NC} （3）更新服务${BLUE}                                 ║${NC}"
-    echo -e "${BLUE}║${NC} （4）查看服务后台日志${BLUE}                          ║${NC}"
-    echo -e "${BLUE}║${NC} （5）卸载服务${BLUE}                                 ║${NC}"
+    echo -e "${BLUE}║${NC} （2）查看服务日志${BLUE}                             ║${NC}"
+    echo -e "${BLUE}║${NC} （3）设置白名单${BLUE}                              ║${NC}"
+    echo -e "${BLUE}║${NC} （4）设置同IP并发限制${BLUE}                         ║${NC}"
+    echo -e "${BLUE}║${NC} （5）设置私钥${BLUE}                                ║${NC}"
+    echo -e "${BLUE}║${NC} （6）更新项目管理脚本${BLUE}                          ║${NC}"
+    echo -e "${BLUE}║${NC} （7）更新服务${BLUE}                                 ║${NC}"
     echo -e "${BLUE}╠══════════════════════════════════════════════════╣${NC}"
     echo -e "${BLUE}║${RED} （0）退出${NC}${BLUE}                                      ║${NC}"
     echo -e "${BLUE}╚══════════════════════════════════════════════════╝${NC}"
-    read -rp "$(echo -e "${BLUE}输入你的选择 [0-5]: ${NC}")" choice
+    read -rp "$(echo -e "${BLUE}输入你的选择 [0-7]: ${NC}")" choice
+
+    # 检查是否已部署
+    if [[ $choice -ge 1 && $choice -le 5 ]]; then
+        if ! is_deployed; then
+            echo -e "${RED}>>> 项目尚未部署，请先部署项目。${NC}"
+            return
+        fi
+    fi
+
     case $choice in
         1)
-            echo -e "${YELLOW}>>> 你选择了启动/重启服务${NC}"
             retry_function start_or_restart_service
-            check_service_status
             ;;
         2)
-            echo -e "${YELLOW}>>> 你选择了更新项目管理脚本${NC}"
-            retry_function update_script
+            view_service_logs
             ;;
         3)
-            echo -e "${YELLOW}>>> 你选择了更新服务${NC}"
+            whitelist_menu
+            ;;
+        4)
+            set_concurrent_requests
+            ;;
+        5)
+            set_private_key
+            ;;
+        6)
+            retry_function update_script
+            ;;
+        7)
             retry_function update_project
             retry_function build_project
             find_latest_jar
+            retry_function move_config_and_set_env
             setup_service
             start_or_restart_service
-            check_service_status
-            ;;
-        4)
-            echo -e "${YELLOW}>>> 你选择了查看服务后台日志${NC}"
-            view_service_logs
-            ;;
-        5)
-            echo -e "${RED}>>> 你选择了卸载服务${NC}"
-            uninstall_service
             ;;
         0)
-            echo -e "${RED}>>> 退出脚本${NC}"
             exit 0
             ;;
         *)
-            echo -e "${RED}>>> 无效的选择，请重新选择${NC}"
+            echo -e "${RED}无效的选择，请重新选择${NC}"
             ;;
     esac
 }
@@ -262,13 +301,13 @@ function show_menu() {
 show_header
 if is_deployed; then
     echo -e "${GREEN}>>> 项目已部署。${NC}"
-    while true; do  # 用 while 循环包裹菜单
-        show_menu  # 如果项目已部署，则显示菜单
+    while true; do
+        show_menu
     done
 else
     echo -e "${YELLOW}>>> 项目尚未部署，开始部署流程...${NC}"
-    deploy_project  # 如果项目尚未部署，执行完整的部署流程
-    while true; do  # 部署完成后进入主菜单
+    deploy_project
+    while true; do
         show_menu
     done
 fi
