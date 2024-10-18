@@ -24,9 +24,7 @@ import java.security.KeyFactory;
 import java.security.MessageDigest;
 import java.security.PrivateKey;
 import java.security.spec.PKCS8EncodedKeySpec;
-import java.util.Base64;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -40,9 +38,9 @@ public class AsyncController {
     private static final String ENCRYPTION_PREFIX = "ENC:";
     private static final String ENCRYPTION_ALGORITHM = "RSA/ECB/OAEPWithSHA-256AndMGF1Padding";
 
-    private static PrivateKey privateKey; // 私钥
-    private static List<String> whitelist; // 白名单
-    private static int maxIPConcurrentRequests; // 最大同IP并发请求数
+    private static PrivateKey privateKey; // 私钥，默认为null
+    private static List<String> whitelist = new ArrayList<>(); // 白名单，默认为空列表
+    private static int maxIPConcurrentRequests = 2; // 最大同IP并发请求数，默认为2
 
     private final WebClient webClient = WebClient.create(); // 用于非阻塞HTTP请求
     private final Map<String, AtomicInteger> ipRequestCount = new ConcurrentHashMap<>(); // 记录每个IP的并发请求数
@@ -62,14 +60,13 @@ public class AsyncController {
         startWatchService(); // 启动WatchService监控config.json文件变化
     }
 
+    // 加载配置文件流，并处理无法加载的情况
     private InputStream getConfigFileStream() {
-        // 优先检查环境变量或系统属性中的路径
         String configPath = System.getenv("CONFIG_JSON_PATH");
         if (configPath == null || configPath.isEmpty()) {
             configPath = System.getProperty("config.json.path");
         }
 
-        // 如果提供了外部路径，优先使用
         if (configPath != null && !configPath.isEmpty()) {
             File externalConfig = new File(configPath);
             if (externalConfig.exists() && externalConfig.isFile()) {
@@ -82,7 +79,7 @@ public class AsyncController {
             }
         }
 
-        // 尝试通过ClassLoader加载JAR包中的配置文件
+        // 尝试通过ClassLoader加载内部配置文件
         ClassLoader classLoader = getClass().getClassLoader();
         InputStream inputStream = classLoader.getResourceAsStream("config.json");
         if (inputStream != null) {
@@ -90,14 +87,15 @@ public class AsyncController {
             return inputStream;
         }
 
-        // 如果没有找到配置文件，抛出异常
-        throw new IllegalStateException("配置文件不存在或无效。");
+        logger.warn("未找到配置文件，将使用默认配置");
+        return null; // 如果找不到配置文件，返回null，并使用默认值
     }
 
     // 启动WatchService，监听config.json文件的变化
     private void startWatchService() {
         try {
-            File configFilePath = new File(System.getenv("CONFIG_JSON_PATH") != null ? System.getenv("CONFIG_JSON_PATH") : "src/main/resources/config.json");
+            String configPath = System.getenv("CONFIG_JSON_PATH") != null ? System.getenv("CONFIG_JSON_PATH") : "src/main/resources/config.json";
+            File configFilePath = new File(configPath);
             if (configFilePath.exists()) {
                 WatchService watchService = FileSystems.getDefault().newWatchService();
                 Path configDir = configFilePath.getParentFile().toPath();
@@ -127,40 +125,66 @@ public class AsyncController {
         }
     }
 
-    // 重新加载配置，并仅在私钥更改时清空缓存
+    // 重新加载配置，并处理异常和默认值
     public void reloadConfig() {
-        try (InputStream configStream = getConfigFileStream()) {
+        InputStream configStream = getConfigFileStream();
+        if (configStream == null) {
+            logger.info("配置文件加载失败，将使用默认值");
+            useDefaultConfig();
+            return;
+        }
+
+        try {
             ObjectMapper objectMapper = new ObjectMapper();
             Map<String, Object> config = objectMapper.readValue(configStream, Map.class);
 
-            // 加载新私钥
+            // 加载私钥
             String privateKeyString = (String) config.get("privateKey");
-            byte[] keyBytes = Base64.getDecoder().decode(privateKeyString);
+            privateKey = loadPrivateKey(privateKeyString);
 
-            try {
-                PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
-                KeyFactory kf = KeyFactory.getInstance("RSA");
-                PrivateKey newPrivateKey = kf.generatePrivate(spec);
-
-                // 仅在私钥变化时清空缓存
-                if (!newPrivateKey.equals(privateKey)) {
-                    privateKey = newPrivateKey;
-                    decryptionCache.invalidateAll(); // 私钥变化，清空缓存
-                    logger.info("私钥已更改，缓存已清空");
-                }
-            } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
-                logger.error("加载私钥时发生错误: {}", e.getMessage());
-                return; // 处理异常时可以根据实际需求决定是否继续加载其他配置
+            // 更新白名单
+            whitelist = (List<String>) config.getOrDefault("whitelist", new ArrayList<>());
+            if (whitelist.isEmpty()) {
+                logger.warn("配置文件中未找到 whitelist 或为空，将使用默认空白名单");
             }
 
-            // 更新其他配置
-            whitelist = (List<String>) config.get("whitelist");
-            maxIPConcurrentRequests = (int) config.get("maxConcurrentRequestsPerIP");
+            // 更新最大同IP并发请求数
+            maxIPConcurrentRequests = (int) config.getOrDefault("maxConcurrentRequestsPerIP", 2);
+            if (maxIPConcurrentRequests <= 0) {
+                logger.warn("配置文件中 maxConcurrentRequestsPerIP 无效，将使用默认值 2");
+                maxIPConcurrentRequests = 2;
+            }
 
             logger.info("配置已成功从 config.json 文件加载");
         } catch (IOException e) {
-            logger.error("加载 config.json 文件时发生错误，将继续使用上次的配置: {}", e.getMessage());
+            logger.error("加载 config.json 文件时发生错误，将使用默认配置: {}", e.getMessage());
+            useDefaultConfig(); // 异常时使用默认值
         }
+    }
+
+    // 加载私钥，捕获异常并返回null
+    private PrivateKey loadPrivateKey(String privateKeyString) {
+        if (privateKeyString == null || privateKeyString.isEmpty()) {
+            logger.warn("配置文件中缺少 privateKey 字段或内容为空，将私钥设置为null");
+            return null;
+        }
+        try {
+            byte[] keyBytes = Base64.getDecoder().decode(privateKeyString);
+            PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
+            KeyFactory kf = KeyFactory.getInstance("RSA");
+            return kf.generatePrivate(spec);
+        } catch (IllegalArgumentException | NoSuchAlgorithmException | InvalidKeySpecException e) {
+            logger.error("加载私钥时发生错误: {}，将私钥设置为null", e.getMessage());
+            return null;
+        }
+    }
+
+    // 使用默认配置
+    private void useDefaultConfig() {
+        privateKey = null;
+        whitelist = new ArrayList<>();
+        maxIPConcurrentRequests = 2;
+        logger.info("默认配置已加载：白名单为空列表，最大同IP并发请求数为2，私钥为空");
     }
 
     // 生成加密消息的哈希值
@@ -188,82 +212,4 @@ public class AsyncController {
                 Cipher cipher = Cipher.getInstance(ENCRYPTION_ALGORITHM);
                 cipher.init(Cipher.DECRYPT_MODE, privateKey);
 
-                byte[] encryptedBytes = DatatypeConverter.parseHexBinary(encryptedMessage.substring(ENCRYPTION_PREFIX.length())); // 移除前缀
-                byte[] decryptedMessage = cipher.doFinal(encryptedBytes);
-                return new String(decryptedMessage);
-            });
-        } catch (Exception e) {
-            logger.error("解密消息时发生错误: {}", e.getMessage());
-            return encryptedMessage; // 解密失败时返回原始消息
-        }
-    }
-
-    @PostMapping("/{urlOrParam}")
-    public Flux<DataBuffer> captureAndForward(@PathVariable String urlOrParam,
-                                              @RequestBody RequestBodyData requestBodyData,
-                                              @RequestHeader HttpHeaders headers,
-                                              @RequestHeader(value = "X-Forwarded-For", defaultValue = "localhost") String clientIp) {
-        if (requestBodyData.getMessages() == null || requestBodyData.getMessages().isEmpty()) {
-            return Flux.error(new IllegalArgumentException("没有消息需要处理"));
-        }
-
-        AtomicInteger currentRequests = ipRequestCount.computeIfAbsent(clientIp, k -> new AtomicInteger(0));
-        if (currentRequests.incrementAndGet() > maxIPConcurrentRequests) {
-            currentRequests.decrementAndGet(); // 减少并发数
-            return Flux.error(new IllegalArgumentException("来自该IP的并发请求过多"));
-        }
-
-        String targetUrl = resolveTargetUrl(urlOrParam);
-        if (!whitelist.contains(targetUrl)) {
-            currentRequests.decrementAndGet();
-            return Flux.error(new IllegalArgumentException("URL不在白名单中"));
-        }
-
-        HttpHeaders filteredHeaders = filterHeaders(headers);
-        logger.info("转发到目标URL: {}", targetUrl);
-        logger.debug("转发的请求数据: {}", requestBodyData);
-
-        return Flux.fromIterable(requestBodyData.getMessages())
-            .flatMap(message -> {
-                try {
-                    // 仅在消息以 "ENC:" 开头时才尝试解密
-                    if (isEncrypted(message.getContent())) {
-                        String decryptedContent = decryptAndCache(message.getContent());
-                        message.setContent(decryptedContent);
-                    }
-                    return Mono.just(message);  // 返回已修改或未修改的消息
-                } catch (Exception e) {
-                    logger.error("解密消息时发生错误: {}", e.getMessage());
-                    return Mono.error(e);
-                }
-            })
-            .thenMany(webClient.post()
-                .uri(targetUrl)
-                .headers(httpHeaders -> httpHeaders.addAll(filteredHeaders))
-                .bodyValue(requestBodyData)  // 将更新后的 message 发送出去
-                .retrieve()
-                .bodyToFlux(DataBuffer.class))
-            .doFinally(signalType -> currentRequests.decrementAndGet());
-    }
-
-    private String resolveTargetUrl(String urlOrParam) {
-        return switch (urlOrParam.toLowerCase()) {
-            case "claude" -> claudeUrl;
-            case "clewd" -> clewdUrl;
-            default -> urlOrParam.startsWith("http") ? urlOrParam : "https://" + urlOrParam;
-        };
-    }
-
-    private HttpHeaders filterHeaders(HttpHeaders headers) {
-        HttpHeaders filteredHeaders = new HttpHeaders();
-        headers.forEach((key, value) -> {
-            if (!key.equalsIgnoreCase("Host") &&
-                !key.equalsIgnoreCase("Content-Length") &&
-                !key.equalsIgnoreCase("Accept-Encoding") &&
-                !key.equalsIgnoreCase("Connection")) {
-                filteredHeaders.put(key, value);
-            }
-        });
-        return filteredHeaders;
-    }
-}
+                byte[] encryptedBytes = DatatypeConverter.parseHexBinary(encryptedMessage.substring(ENCRYPTION_PREFIX.length
