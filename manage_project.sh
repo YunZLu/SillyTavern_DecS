@@ -81,7 +81,7 @@ function allow_port() {
 
 # 检查是否已部署
 function is_deployed() {
-    if [ -f "$SERVICE_FILE" ] && [ -n "$(find $PROJECT_NAME/target -name '*.jar')" ]; then
+    if [ -f "$SERVICE_FILE" ] && [ -n "$(find $PROJECT_NAME/target -name '*.jar' 2>/dev/null)" ]; then
         return 0  # 已部署
     else
         return 1  # 未部署
@@ -126,7 +126,7 @@ function build_project() {
 
 # 找到最新的 JAR 文件
 function find_latest_jar() {
-    JAR_FILE=$(find target -name "*.jar" | head -n 1)
+    JAR_FILE=$(find target -name "*.jar" | head -n 1 2>/dev/null)
     echo -e "${GREEN}>>> 找到的 JAR 文件: $JAR_FILE${NC}"
 }
 
@@ -158,10 +158,17 @@ function set_private_key() {
     echo -e "${GREEN}私钥已更新！${NC}"
 }
 
-# 创建/更新 systemd 服务文件
+# 更新 systemd 服务文件
 function setup_service() {
-    if [ ! -f "$SERVICE_FILE" ];then
-        sudo bash -c 'cat <<EOF > '"$SERVICE_FILE"'
+    if [ -f "$SERVICE_FILE" ]; then
+        echo -e "${YELLOW}>>> 检测到已存在的 systemd 服务文件，正在删除...${NC}"
+        sudo systemctl stop "$APP_NAME"  # 停止现有服务
+        sudo rm -f "$SERVICE_FILE"       # 删除旧的服务文件
+        echo -e "${GREEN}>>> 旧的 systemd 服务文件已删除，正在重新构建服务...${NC}"
+    fi
+    
+    # 创建新的 systemd 服务文件
+    sudo bash -c 'cat <<EOF > '"$SERVICE_FILE"'
 [Unit]
 Description=Spring Boot Application for '"$PROJECT_NAME"'
 After=network.target
@@ -179,9 +186,7 @@ RestartSec=5
 [Install]
 WantedBy=multi-user.target
 EOF'
-    else
-        echo -e "${GREEN}>>> systemd 服务文件已存在，跳过创建步骤...${NC}"
-    fi
+    echo -e "${GREEN}>>> 新的 systemd 服务文件已创建${NC}"
 }
 
 # 启动或重启服务
@@ -258,7 +263,7 @@ function show_menu() {
             retry_function build_project
             find_latest_jar
             retry_function move_config_and_set_env
-            setup_service
+            setup_service  # 调用新的 setup_service
             start_or_restart_service
             ;;
         0)
