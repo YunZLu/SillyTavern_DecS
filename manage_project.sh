@@ -98,7 +98,8 @@ function deploy_project() {
     retry_function allow_port
     retry_function build_project
     find_latest_jar
-    retry_function move_config_and_set_env
+    move_config_and_set_env  # 移动 config.json
+    set_private_key          # 提示用户修改私钥
     setup_service
     start_or_restart_service
     echo -e "${GREEN}>>> 项目部署完成！${NC}"
@@ -138,9 +139,23 @@ function move_config_and_set_env() {
         sudo chmod 644 "$CONFIG_PATH"
         echo "CONFIG_JSON_PATH=$CONFIG_PATH" | sudo tee -a /etc/environment > /dev/null
         source /etc/environment
+        echo -e "${GREEN}>>> config.json 已移动至 $CONFIG_PATH 并设置环境变量${NC}"
     else
         echo -e "${RED}>>> 未找到 config.json 文件，跳过移动步骤。${NC}"
     fi
+}
+
+# 修改私钥
+function set_private_key() {
+    local current_private_key
+    current_private_key=$(jq -r '.privateKey' "$CONFIG_PATH")
+    
+    echo -e "${YELLOW}当前私钥: ${current_private_key:0:30}...(已隐藏)${NC}"
+    echo -e "${YELLOW}请输入新的私钥内容（多行输入，按 Ctrl+D 完成输入）:${NC}"
+    private_key=$(</dev/stdin)  # 捕获多行输入的私钥
+    private_key=$(echo "$private_key" | tr -d '\n' | sed 's/ //g')  # 删除换行符和空格
+    jq '.privateKey = "'"$private_key"'"' "$CONFIG_PATH" > tmp.$$.json && mv tmp.$$.json "$CONFIG_PATH"
+    echo -e "${GREEN}私钥已更新！${NC}"
 }
 
 # 创建/更新 systemd 服务文件
