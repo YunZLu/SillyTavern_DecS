@@ -112,25 +112,31 @@ public class AsyncController {
         try {
             ObjectMapper objectMapper = new ObjectMapper();
             Map<String, Object> config = objectMapper.readValue(configFilePath, Map.class);
-
+    
             // 加载新私钥
             String privateKeyString = (String) config.get("privateKey");
             byte[] keyBytes = Base64.getDecoder().decode(privateKeyString);
-            PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
-            KeyFactory kf = KeyFactory.getInstance("RSA");
-            PrivateKey newPrivateKey = kf.generatePrivate(spec);
-
-            // 仅在私钥变化时清空缓存
-            if (!newPrivateKey.equals(privateKey)) {
-                privateKey = newPrivateKey;
-                decryptionCache.invalidateAll(); // 私钥变化，清空缓存
-                logger.info("私钥已更改，缓存已清空");
+            
+            try {
+                PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
+                KeyFactory kf = KeyFactory.getInstance("RSA");
+                PrivateKey newPrivateKey = kf.generatePrivate(spec);
+    
+                // 仅在私钥变化时清空缓存
+                if (!newPrivateKey.equals(privateKey)) {
+                    privateKey = newPrivateKey;
+                    decryptionCache.invalidateAll(); // 私钥变化，清空缓存
+                    logger.info("私钥已更改，缓存已清空");
+                }
+            } catch (NoSuchAlgorithmException | InvalidKeySpecException e) {
+                logger.error("加载私钥时发生错误: {}", e.getMessage());
+                return; // 处理异常时可以根据实际需求决定是否继续加载其他配置
             }
-
+    
             // 更新其他配置
             whitelist = (List<String>) config.get("whitelist");
             maxIPConcurrentRequests = (int) config.get("maxConcurrentRequestsPerIP");
-
+    
             logger.info("配置已成功从 config.json 文件加载");
         } catch (IOException e) {
             logger.error("加载 config.json 文件时发生错误，将继续使用上次的配置: {}", e.getMessage());
