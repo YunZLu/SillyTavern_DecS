@@ -17,7 +17,8 @@
         <jackson.version>2.14.0</jackson.version>
         <lombok.version>1.18.24</lombok.version>
         <slf4j.version>2.0.0</slf4j.version>
-        <reactor.version>3.4.15</reactor.version>
+        <reactor.version>3.5.0</reactor.version> <!-- 升级 reactor 核心版本 -->
+        <reactor.netty.version>1.1.7</reactor.netty.version> <!-- 添加 reactor-netty 版本 -->
     </properties>
 
     <dependencies>
@@ -52,6 +53,13 @@
             <groupId>io.projectreactor</groupId>
             <artifactId>reactor-core</artifactId>
             <version>${reactor.version}</version>
+        </dependency>
+
+        <!-- Reactor Netty 依赖，支持非阻塞IO -->
+        <dependency>
+            <groupId>io.projectreactor.netty</groupId>
+            <artifactId>reactor-netty</artifactId>
+            <version>${reactor.netty.version}</version>
         </dependency>
 
         <!-- Guava 库，支持缓存机制 -->
