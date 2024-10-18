@@ -241,7 +241,6 @@ function start_or_restart_service() {
 # 部署项目函数
 function deploy_project() {
     echo -e "${YELLOW}>>> 开始部署项目...${NC}"
-    retry_function update_system
     retry_function install_and_check_dependencies
     retry_function update_project
     retry_function allow_port
