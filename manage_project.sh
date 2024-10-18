@@ -88,111 +88,20 @@ function is_deployed() {
     fi
 }
 
-# 白名单设置页面
-function whitelist_menu() {
-    echo -e "${BLUE}╔══════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║               ${GREEN}设置白名单${NC}${BLUE}                        ║${NC}"
-    echo -e "${BLUE}╠══════════════════════════════════════════════════╣${NC}"
-    echo -e "${BLUE}║${NC} （1）查看白名单${BLUE}                                  ║${NC}"
-    echo -e "${BLUE}║${NC} （2）增加白名单${BLUE}                                  ║${NC}"
-    echo -e "${BLUE}║${NC} （3）删除白名单${BLUE}                                  ║${NC}"
-    echo -e "${BLUE}║${NC} （4）修改白名单${BLUE}                                  ║${NC}"
-    echo -e "${BLUE}╠══════════════════════════════════════════════════╣${NC}"
-    echo -e "${BLUE}║${NC} （0）返回主菜单${BLUE}                                  ║${NC}"
-    echo -e "${BLUE}╚══════════════════════════════════════════════════╝${NC}"
-    read -rp "$(echo -e "${BLUE}请输入你的选择 [0-4]: ${NC}")" whitelist_choice
-
-    case $whitelist_choice in
-        1)
-            view_whitelist
-            ;;
-        2)
-            add_whitelist
-            ;;
-        3)
-            delete_whitelist
-            ;;
-        4)
-            modify_whitelist
-            ;;
-        0)
-            show_menu
-            ;;
-        *)
-            echo -e "${RED}无效的选择${NC}"
-            ;;
-    esac
-}
-
-# 查看白名单
-function view_whitelist() {
-    local whitelist
-    whitelist=$(jq -r '.whitelist[]' "$CONFIG_PATH")
-    echo -e "${GREEN}当前白名单: ${NC}"
-    echo "$whitelist" | nl  # 使用 nl 命令为白名单项编号
-}
-
-# 增加白名单
-function add_whitelist() {
-    read -rp "请输入要增加的白名单 URL: " new_entry
-    jq '.whitelist += ["'"$new_entry"'"]' "$CONFIG_PATH" > tmp.$$.json && mv tmp.$$.json "$CONFIG_PATH"
-    echo -e "${GREEN}白名单已增加: $new_entry${NC}"
-}
-
-# 删除白名单
-function delete_whitelist() {
-    view_whitelist
-    read -rp "请输入要删除的白名单项编号: " number
-    jq '.whitelist |= del(.[('"$number"'-1)])' "$CONFIG_PATH" > tmp.$$.json && mv tmp.$$.json "$CONFIG_PATH"
-    echo -e "${GREEN}白名单项已删除${NC}"
-}
-
-# 修改白名单
-function modify_whitelist() {
-    view_whitelist
-    read -rp "请输入要修改的白名单项编号: " number
-    read -rp "请输入新的白名单 URL: " new_entry
-    jq '.whitelist['"$number"'-1] = "'"$new_entry"'"' "$CONFIG_PATH" > tmp.$$.json && mv tmp.$$.json "$CONFIG_PATH"
-    echo -e "${GREEN}白名单已修改为: $new_entry${NC}"
-}
-
-# 修改同IP并发限制
-function set_concurrent_requests() {
-    local current_limit
-    current_limit=$(jq -r '.maxConcurrentRequestsPerIP' "$CONFIG_PATH")
-    
-    echo -e "${YELLOW}当前同IP并发请求限制: $current_limit${NC}"
-    read -rp "请输入新的同IP并发请求限制: " new_limit
-    jq '.maxConcurrentRequestsPerIP = '"$new_limit" "$CONFIG_PATH" > tmp.$$.json && mv tmp.$$.json "$CONFIG_PATH"
-    echo -e "${GREEN}同IP并发请求限制已更新！${NC}"
-}
-
-# 修改私钥
-function set_private_key() {
-    local current_private_key
-    current_private_key=$(jq -r '.privateKey' "$CONFIG_PATH")
-    
-    echo -e "${YELLOW}当前私钥: ${current_private_key:0:30}...(已隐藏)${NC}"
-    echo -e "${YELLOW}请输入新的私钥内容（多行输入，按 Ctrl+D 完成输入）:${NC}"
-    private_key=$(</dev/stdin)  # 捕获多行输入的私钥
-    private_key=$(echo "$private_key" | tr -d '\n' | sed 's/ //g')  # 删除换行符和空格
-    jq '.privateKey = "'"$private_key"'"' "$CONFIG_PATH" > tmp.$$.json && mv tmp.$$.json "$CONFIG_PATH"
-    echo -e "${GREEN}私钥已更新！${NC}"
-}
-
-# 启动或重启服务
-function start_or_restart_service() {
-    echo -e "${YELLOW}>>> 启动或重启 Spring Boot 应用服务...${NC}"
-    sudo systemctl daemon-reload
-    sudo systemctl restart "$APP_NAME"
-    sudo systemctl enable "$APP_NAME"
-    echo -e "${GREEN}>>> 服务已启动/重启成功！${NC}"
-}
-
-# 查看服务日志
-function view_service_logs() {
-    echo -e "${YELLOW}>>> 查看服务日志...${NC}"
-    sudo journalctl -u "$APP_NAME" -f
+# 部署项目函数
+function deploy_project() {
+    echo -e "${YELLOW}>>> 开始部署项目...${NC}"
+    retry_function update_system
+    retry_function install_dependencies
+    check_installation
+    retry_function update_project
+    retry_function allow_port
+    retry_function build_project
+    find_latest_jar
+    retry_function move_config_and_set_env
+    setup_service
+    start_or_restart_service
+    echo -e "${GREEN}>>> 项目部署完成！${NC}"
 }
 
 # 克隆或更新项目
@@ -218,6 +127,55 @@ function build_project() {
 function find_latest_jar() {
     JAR_FILE=$(find target -name "*.jar" | head -n 1)
     echo -e "${GREEN}>>> 找到的 JAR 文件: $JAR_FILE${NC}"
+}
+
+# 移动配置文件并设置环境变量
+function move_config_and_set_env() {
+    cd "/root/$PROJECT_NAME" || exit
+    if [ -f "src/main/resources/config.json" ]; then
+        sudo mkdir -p /etc/$APP_NAME/
+        sudo cp src/main/resources/config.json "$CONFIG_PATH"
+        sudo chmod 644 "$CONFIG_PATH"
+        echo "CONFIG_JSON_PATH=$CONFIG_PATH" | sudo tee -a /etc/environment > /dev/null
+        source /etc/environment
+    else
+        echo -e "${RED}>>> 未找到 config.json 文件，跳过移动步骤。${NC}"
+    fi
+}
+
+# 创建/更新 systemd 服务文件
+function setup_service() {
+    if [ ! -f "$SERVICE_FILE" ];then
+        sudo bash -c 'cat <<EOF > '"$SERVICE_FILE"'
+[Unit]
+Description=Spring Boot Application for '"$PROJECT_NAME"'
+After=network.target
+
+[Service]
+User=root
+Environment=CONFIG_JSON_PATH='"$CONFIG_PATH"'
+WorkingDirectory=/root/'"$PROJECT_NAME"'
+ExecStart=/usr/bin/java -jar /root/'"$PROJECT_NAME"'/'"$JAR_FILE"' --server.port='"$DEFAULT_PORT"' > /var/log/'"$APP_NAME"'.log 2>&1
+SuccessExitStatus=143
+TimeoutStopSec=10
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF'
+    else
+        echo -e "${GREEN}>>> systemd 服务文件已存在，跳过创建步骤...${NC}"
+    fi
+}
+
+# 启动或重启服务
+function start_or_restart_service() {
+    echo -e "${YELLOW}>>> 启动或重启 Spring Boot 应用服务...${NC}"
+    sudo systemctl daemon-reload
+    sudo systemctl restart "$APP_NAME"
+    sudo systemctl enable "$APP_NAME"
+    echo -e "${GREEN}>>> 服务已启动/重启成功！${NC}"
 }
 
 # 更新脚本
