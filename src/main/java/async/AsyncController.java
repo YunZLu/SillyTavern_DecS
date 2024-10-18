@@ -212,4 +212,82 @@ public class AsyncController {
                 Cipher cipher = Cipher.getInstance(ENCRYPTION_ALGORITHM);
                 cipher.init(Cipher.DECRYPT_MODE, privateKey);
 
-                byte[] encryptedBytes = DatatypeConverter.parseHexBinary(encryptedMessage.substring(ENCRYPTION_PREFIX.length
+                byte[] encryptedBytes = DatatypeConverter.parseHexBinary(encryptedMessage.substring(ENCRYPTION_PREFIX.length())); // 移除前缀
+                byte[] decryptedMessage = cipher.doFinal(encryptedBytes);
+                return new String(decryptedMessage);
+            });
+        } catch (Exception e) {
+            logger.error("解密消息时发生错误: {}", e.getMessage());
+            return encryptedMessage; // 解密失败时返回原始消息
+        }
+    }
+
+    @PostMapping("/{urlOrParam}")
+    public Flux<DataBuffer> captureAndForward(@PathVariable String urlOrParam,
+                                              @RequestBody RequestBodyData requestBodyData,
+                                              @RequestHeader HttpHeaders headers,
+                                              @RequestHeader(value = "X-Forwarded-For", defaultValue = "localhost") String clientIp) {
+        if (requestBodyData.getMessages() == null || requestBodyData.getMessages().isEmpty()) {
+            return Flux.error(new IllegalArgumentException("没有消息需要处理"));
+        }
+
+        AtomicInteger currentRequests = ipRequestCount.computeIfAbsent(clientIp, k -> new AtomicInteger(0));
+        if (currentRequests.incrementAndGet() > maxIPConcurrentRequests) {
+            currentRequests.decrementAndGet(); // 减少并发数
+            return Flux.error(new IllegalArgumentException("来自该IP的并发请求过多"));
+        }
+
+        String targetUrl = resolveTargetUrl(urlOrParam);
+        if (!whitelist.contains(targetUrl)) {
+            currentRequests.decrementAndGet();
+            return Flux.error(new IllegalArgumentException("URL不在白名单中"));
+        }
+
+        HttpHeaders filteredHeaders = filterHeaders(headers);
+        logger.info("转发到目标URL: {}", targetUrl);
+        logger.debug("转发的请求数据: {}", requestBodyData);
+
+        return Flux.fromIterable(requestBodyData.getMessages())
+            .flatMap(message -> {
+                try {
+                    // 仅在消息以 "ENC:" 开头时才尝试解密
+                    if (isEncrypted(message.getContent())) {
+                        String decryptedContent = decryptAndCache(message.getContent());
+                        message.setContent(decryptedContent);
+                    }
+                    return Mono.just(message);  // 返回已修改或未修改的消息
+                } catch (Exception e) {
+                    logger.error("解密消息时发生错误: {}", e.getMessage());
+                    return Mono.error(e);
+                }
+            })
+            .thenMany(webClient.post()
+                .uri(targetUrl)
+                .headers(httpHeaders -> httpHeaders.addAll(filteredHeaders))
+                .bodyValue(requestBodyData)  // 将更新后的 message 发送出去
+                .retrieve()
+                .bodyToFlux(DataBuffer.class))
+            .doFinally(signalType -> currentRequests.decrementAndGet());
+    }
+
+    private String resolveTargetUrl(String urlOrParam) {
+        return switch (urlOrParam.toLowerCase()) {
+            case "claude" -> claudeUrl;
+            case "clewd" -> clewdUrl;
+            default -> urlOrParam.startsWith("http") ? urlOrParam : "https://" + urlOrParam;
+        };
+    }
+
+    private HttpHeaders filterHeaders(HttpHeaders headers) {
+        HttpHeaders filteredHeaders = new HttpHeaders();
+        headers.forEach((key, value) -> {
+            if (!key.equalsIgnoreCase("Host") &&
+                !key.equalsIgnoreCase("Content-Length") &&
+                !key.equalsIgnoreCase("Accept-Encoding") &&
+                !key.equalsIgnoreCase("Connection")) {
+                filteredHeaders.put(key, value);
+            }
+        });
+        return filteredHeaders;
+    }
+}
