@@ -198,6 +198,28 @@ function start_or_restart_service() {
     echo -e "${GREEN}>>> 服务已启动/重启成功！${NC}"
 }
 
+# 完全卸载服务
+function uninstall_service() {
+    echo -e "${YELLOW}>>> 正在停止并禁用服务...${NC}"
+    sudo systemctl stop "$APP_NAME"
+    sudo systemctl disable "$APP_NAME"
+    
+    echo -e "${YELLOW}>>> 删除 systemd 服务文件...${NC}"
+    sudo rm -f "$SERVICE_FILE"
+
+    echo -e "${YELLOW}>>> 删除项目文件夹...${NC}"
+    sudo rm -rf "/root/$PROJECT_NAME"
+
+    echo -e "${YELLOW}>>> 删除外部配置文件...${NC}"
+    sudo rm -f "$CONFIG_PATH"
+    
+    echo -e "${YELLOW}>>> 删除环境变量 CONFIG_JSON_PATH...${NC}"
+    sudo sed -i '/CONFIG_JSON_PATH/d' /etc/environment
+    source /etc/environment
+    
+    echo -e "${GREEN}>>> 服务及相关文件已完全卸载。${NC}"
+}
+
 # 更新脚本
 function update_script() {
     echo -e "${YELLOW}>>> 正在检查脚本更新...${NC}"
@@ -226,10 +248,11 @@ function show_menu() {
     echo -e "${BLUE}║${NC} （5）设置私钥${BLUE}                                ║${NC}"
     echo -e "${BLUE}║${NC} （6）更新项目管理脚本${BLUE}                          ║${NC}"
     echo -e "${BLUE}║${NC} （7）更新服务${BLUE}                                 ║${NC}"
+    echo -e "${BLUE}║${NC} （8）完全卸载服务${BLUE}                             ║${NC}"
     echo -e "${BLUE}╠══════════════════════════════════════════════════╣${NC}"
     echo -e "${BLUE}║${RED} （0）退出${NC}${BLUE}                                      ║${NC}"
     echo -e "${BLUE}╚══════════════════════════════════════════════════╝${NC}"
-    read -rp "$(echo -e "${BLUE}输入你的选择 [0-7]: ${NC}")" choice
+    read -rp "$(echo -e "${BLUE}输入你的选择 [0-8]: ${NC}")" choice
 
     # 检查是否已部署
     if [[ $choice -ge 1 && $choice -le 5 ]]; then
@@ -265,6 +288,9 @@ function show_menu() {
             retry_function move_config_and_set_env
             setup_service  # 调用新的 setup_service
             start_or_restart_service
+            ;;
+        8)
+            uninstall_service
             ;;
         0)
             exit 0
