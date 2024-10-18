@@ -133,7 +133,7 @@ function find_latest_jar() {
 # 移动配置文件并设置环境变量
 function move_config_and_set_env() {
     cd "/root/$PROJECT_NAME" || exit
-    if [ -f "src/main/resources/config.json" ]; then
+    if [ -f "src/main/resources/config.json" ];then
         sudo mkdir -p /etc/$APP_NAME/
         sudo cp src/main/resources/config.json "$CONFIG_PATH"
         sudo chmod 644 "$CONFIG_PATH"
@@ -160,7 +160,7 @@ function set_private_key() {
 
 # 更新 systemd 服务文件
 function setup_service() {
-    if [ -f "$SERVICE_FILE" ]; then
+    if [ -f "$SERVICE_FILE" ];then
         echo -e "${YELLOW}>>> 检测到已存在的 systemd 服务文件，正在删除...${NC}"
         sudo systemctl stop "$APP_NAME"  # 停止现有服务
         sudo rm -f "$SERVICE_FILE"       # 删除旧的服务文件
@@ -200,6 +200,11 @@ function start_or_restart_service() {
 
 # 完全卸载服务
 function uninstall_service() {
+    if ! is_deployed; then
+        echo -e "${RED}>>> 项目尚未部署，无法执行卸载操作。${NC}"
+        return
+    fi
+    
     echo -e "${YELLOW}>>> 正在停止并禁用服务...${NC}"
     sudo systemctl stop "$APP_NAME"
     sudo systemctl disable "$APP_NAME"
