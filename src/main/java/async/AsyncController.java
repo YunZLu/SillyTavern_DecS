@@ -169,9 +169,18 @@ public class AsyncController {
             return null;
         }
         try {
-            byte[] keyBytes = Base64.getDecoder().decode(privateKeyString);
+            // 移除 PEM 标头、尾部和换行符
+            String privateKeyPEM = privateKeyString
+                .replace("-----BEGIN PRIVATE KEY-----", "")
+                .replace("-----END PRIVATE KEY-----", "")
+                .replaceAll("\\s", ""); // 移除所有的空格和换行符
+    
+            // 解码 Base64 编码的私钥
+            byte[] keyBytes = Base64.getDecoder().decode(privateKeyPEM);
+    
+            // 使用 PKCS8EncodedKeySpec 构造私钥
             PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
-            KeyFactory kf = KeyFactory.getInstance("RSA");
+            KeyFactory kf = KeyFactory.getInstance("RSA"); // 确保使用 RSA
             return kf.generatePrivate(spec);
         } catch (IllegalArgumentException | NoSuchAlgorithmException | InvalidKeySpecException e) {
             logger.error("加载私钥时发生错误: {}，将私钥设置为null", e.getMessage());
