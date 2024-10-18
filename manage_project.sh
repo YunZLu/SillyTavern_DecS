@@ -83,7 +83,7 @@ function allow_port() {
 
 # 检查是否已部署
 function is_deployed() {
-    if [ -f "$SERVICE_FILE" ] && [ -n "$(find $PROJECT_NAME/target -name '*.jar')" ]; then
+    if [ -f "$SERVICE_FILE" ] && [ -n "$(find $PROJECT_NAME/target -name '*.jar' 2>/dev/null)" ]; then
         return 0  # 已部署
     else
         return 1  # 未部署
