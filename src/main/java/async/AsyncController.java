@@ -38,7 +38,6 @@ public class AsyncController {
     private static final Logger logger = LoggerFactory.getLogger(AsyncController.class);
 
     // 常量定义
-    private static final String DEFAULT_CONFIG_PATH = "src/main/resources/config.json";
     private static final String ENCRYPTION_PREFIX = "ENC:";
     private static final String ENCRYPTION_ALGORITHM = "RSA/ECB/OAEPWithSHA-256AndMGF1Padding";
 
@@ -67,19 +66,38 @@ public class AsyncController {
         startWatchService(); // 启动WatchService监控config.json文件变化
     }
 
-    // 从外部或默认路径获取配置文件
-    private File getConfigFile() {
-        String configPath = System.getenv("CONFIG_JSON_PATH");
-        if (configPath == null || configPath.isEmpty()) {
-            configPath = System.getProperty("config.json.path", DEFAULT_CONFIG_PATH);
-        }
-        File config = new File(configPath);
-        if (!config.exists() || !config.isFile()) {
-            throw new IllegalStateException("配置文件不存在或无效: " + configPath);
-        }
-        logger.info("加载配置文件: {}", config.getAbsolutePath());
-        return config;
+private File getConfigFile() {
+    // 优先检查环境变量或系统属性中的路径
+    String configPath = System.getenv("CONFIG_JSON_PATH");
+    if (configPath == null || configPath.isEmpty()) {
+        configPath = System.getProperty("config.json.path");
     }
+
+    // 如果提供了外部路径，优先使用
+    if (configPath != null && !configPath.isEmpty()) {
+        File externalConfig = new File(configPath);
+        if (externalConfig.exists() && externalConfig.isFile()) {
+            logger.info("加载外部配置文件: {}", externalConfig.getAbsolutePath());
+            return externalConfig;
+        }
+    }
+
+    // 尝试通过ClassLoader加载JAR包中的配置文件
+    ClassLoader classLoader = getClass().getClassLoader();
+    try {
+        // 从资源路径加载config.json
+        File internalConfig = new File(classLoader.getResource("config.json").toURI());
+        if (internalConfig.exists() && internalConfig.isFile()) {
+            logger.info("加载内部配置文件: {}", internalConfig.getAbsolutePath());
+            return internalConfig;
+        }
+    } catch (Exception e) {
+        logger.error("加载内部配置文件时发生错误: {}", e.getMessage());
+    }
+
+    // 如果没有找到配置文件，抛出异常
+    throw new IllegalStateException("配置文件不存在或无效。");
+}
 
     // 启动WatchService，监听config.json文件的变化
     private void startWatchService() {
