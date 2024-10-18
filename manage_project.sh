@@ -7,6 +7,7 @@ APP_NAME="sillytavern-decs-app"
 SERVICE_FILE="/etc/systemd/system/$APP_NAME.service"
 SCRIPT_URL="https://raw.githubusercontent.com/YunZLu/SillyTavern_DecS/refs/heads/main/manage_project.sh"
 CONFIG_PATH="/etc/$APP_NAME/config.json"
+LOG_FILE="/var/log/$APP_NAME.log"
 
 # 更改默认的服务端口，避免使用常用的 8080 端口
 DEFAULT_PORT=8445
@@ -17,6 +18,15 @@ RED='\033[0;31m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# 在全局变量中保存防火墙工具
+if command -v ufw &> /dev/null; then
+    FIREWALL_TOOL="ufw"
+elif command -v firewall-cmd &> /dev/null; then
+    FIREWALL_TOOL="firewalld"
+else
+    FIREWALL_TOOL="none"
+fi
+
 # 显示标题
 function show_header() {
     echo -e "${BLUE}╔═══════════════════════════════════════════════════════╗${NC}"
@@ -24,16 +34,16 @@ function show_header() {
     echo -e "${BLUE}╚═══════════════════════════════════════════════════════╝${NC}"
 }
 
-# 通用重试函数
+# 通用重试函数，增加最大尝试次数和延迟参数
 function retry_function() {
-    local max_attempts=5
+    local max_attempts=${2:-5}  # 默认5次
+    local delay=${3:-2}  # 默认延迟2秒
     local attempt=1
-    local delay=2
 
     while (( attempt <= max_attempts )); do
-        "$@" && return 0  # 执行传入的函数
+        "$1" && return 0  # 执行传入的函数
         echo -e "${RED}>>> 失败: $1，尝试第 $attempt 次...${NC}"
-        sleep "$delay"  # 等待 2 秒
+        sleep "$delay"
         ((attempt++))
     done
 
@@ -41,41 +51,41 @@ function retry_function() {
     return 1
 }
 
-# 更新系统包
-function update_system() {
-    echo -e "${YELLOW}>>> 更新系统包...${NC}"
-    sudo apt-get update
-}
-
-# 安装依赖
-function install_dependencies() {
-    echo -e "${YELLOW}>>> 安装依赖: Git, openjdk-17-jdk, Maven, curl, ufw, jq...${NC}"
+# 安装依赖并检查安装状态
+function install_and_check_dependencies() {
+    echo -e "${YELLOW}>>> 安装并验证依赖: Git, openjdk-17-jdk, Maven, curl, ufw, jq...${NC}"
     sudo apt-get install -y git openjdk-17-jdk maven curl ufw jq
+
+    # 验证安装
+    echo -e "${YELLOW}>>> 验证安装...${NC}"
+    java -version && mvn -version && jq --version
 }
 
-# 验证安装
-function check_installation() {
-    echo -e "${YELLOW}>>> 验证 Java, Maven 和 jq 安装...${NC}"
-    java -version
-    mvn -version
-    jq --version
-}
-
-# 放行端口
+# 放行端口函数
 function allow_port() {
     echo -e "${YELLOW}>>> 放行 $DEFAULT_PORT 端口...${NC}"
-    
-    if command -v ufw &> /dev/null; then
-        # 使用 ufw
-        sudo ufw allow "$DEFAULT_PORT"/tcp
-        echo -e "${GREEN}>>> $DEFAULT_PORT 端口已成功放行。${NC}"
-    elif command -v firewall-cmd &> /dev/null; then
-        # 使用 firewalld
-        sudo firewall-cmd --zone=public --add-port="$DEFAULT_PORT"/tcp --permanent
-        sudo firewall-cmd --reload
-        echo -e "${GREEN}>>> $DEFAULT_PORT 端口已成功放行。${NC}"
+
+    case $FIREWALL_TOOL in
+        ufw)
+            sudo ufw allow "$DEFAULT_PORT"/tcp
+            ;;
+        firewalld)
+            sudo firewall-cmd --zone=public --add-port="$DEFAULT_PORT"/tcp --permanent
+            sudo firewall-cmd --reload
+            ;;
+        none)
+            echo -e "${RED}>>> 未检测到可用的防火墙工具，请手动放行端口。${NC}"
+            ;;
+    esac
+}
+
+# 停止服务的通用函数
+function stop_service() {
+    if systemctl is-active --quiet "$APP_NAME"; then
+        echo -e "${YELLOW}>>> 停止现有服务...${NC}"
+        sudo systemctl stop "$APP_NAME"
     else
-        echo -e "${RED}>>> 未检测到可用的防火墙工具，请手动放行端口。${NC}"
+        echo -e "${YELLOW}>>> 服务未运行，无需停止。${NC}"
     fi
 }
 
@@ -92,8 +102,7 @@ function is_deployed() {
 function deploy_project() {
     echo -e "${YELLOW}>>> 开始部署项目...${NC}"
     retry_function update_system
-    retry_function install_dependencies
-    check_installation
+    retry_function install_and_check_dependencies
     retry_function update_project
     retry_function allow_port
     retry_function build_project
@@ -107,7 +116,7 @@ function deploy_project() {
 
 # 克隆或更新项目
 function update_project() {
-    if [ -d "$PROJECT_NAME" ];then
+    if [ -d "$PROJECT_NAME" ]; then
         echo -e "${YELLOW}>>> 项目文件夹已存在，拉取最新代码...${NC}"
         cd "$PROJECT_NAME" || exit
         git pull
@@ -133,11 +142,12 @@ function find_latest_jar() {
 # 移动配置文件并设置环境变量
 function move_config_and_set_env() {
     cd "/root/$PROJECT_NAME" || exit
-    if [ -f "src/main/resources/config.json" ];then
+    if [ -f "src/main/resources/config.json" ]; then
         sudo mkdir -p /etc/$APP_NAME/
         sudo cp src/main/resources/config.json "$CONFIG_PATH"
         sudo chmod 644 "$CONFIG_PATH"
         echo "CONFIG_JSON_PATH=$CONFIG_PATH" | sudo tee -a /etc/environment > /dev/null
+        export CONFIG_JSON_PATH=$CONFIG_PATH  # 导出到当前会话环境
         source /etc/environment
         echo -e "${GREEN}>>> config.json 已移动至 $CONFIG_PATH 并设置环境变量${NC}"
     else
@@ -160,10 +170,10 @@ function set_private_key() {
 
 # 更新 systemd 服务文件
 function setup_service() {
-    if [ -f "$SERVICE_FILE" ];then
+    if [ -f "$SERVICE_FILE" ]; then
         echo -e "${YELLOW}>>> 检测到已存在的 systemd 服务文件，正在删除...${NC}"
-        sudo systemctl stop "$APP_NAME"  # 停止现有服务
-        sudo rm -f "$SERVICE_FILE"       # 删除旧的服务文件
+        stop_service  # 停止现有服务
+        sudo rm -f "$SERVICE_FILE"  # 删除旧的服务文件
         echo -e "${GREEN}>>> 旧的 systemd 服务文件已删除，正在重新构建服务...${NC}"
     fi
     
@@ -177,7 +187,7 @@ After=network.target
 User=root
 Environment=CONFIG_JSON_PATH='"$CONFIG_PATH"'
 WorkingDirectory=/root/'"$PROJECT_NAME"'
-ExecStart=/usr/bin/java -jar /root/'"$PROJECT_NAME"'/'"$JAR_FILE"' --server.port='"$DEFAULT_PORT"' > /var/log/'"$APP_NAME"'.log 2>&1
+ExecStart=/usr/bin/java -jar /root/'"$PROJECT_NAME"'/'"$JAR_FILE"' --server.port='"$DEFAULT_PORT"' > '"$LOG_FILE"' 2>&1
 SuccessExitStatus=143
 TimeoutStopSec=10
 Restart=always
