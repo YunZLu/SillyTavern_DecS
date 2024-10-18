@@ -5,10 +5,10 @@ GITHUB_REPO_URL="https://github.com/YunZLu/SillyTavern_DecS.git"
 PROJECT_NAME="SillyTavern_DecS"
 APP_NAME="sillytavern-decs-app"
 SERVICE_FILE="/etc/systemd/system/$APP_NAME.service"
-SECURITY_CONFIG_FILE="src/main/java/async/SecurityConfig.java"
-KEYSTORE_FILE="src/main/resources/keystore.jks"
-APPLICATION_PROPERTIES_FILE="src/main/resources/application.properties"
 SCRIPT_URL="https://raw.githubusercontent.com/YunZLu/SillyTavern_DecS/refs/heads/main/manage_project.sh"
+
+# 更改默认的服务端口，避免使用常用的 8080 端口
+DEFAULT_PORT=8445
 
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
@@ -59,128 +59,21 @@ function check_installation() {
     mvn -version
 }
 
-# 自动获取服务器公网 IP 地址
-function get_public_ip() {
-    echo -e "${YELLOW}>>> 正在获取服务器公网 IP...${NC}"
-    PUBLIC_IP=$(curl -s http://checkip.amazonaws.com)
-    if [ -z "$PUBLIC_IP" ]; then
-        echo -e "${RED}>>> 无法获取服务器公网 IP。请检查网络连接。${NC}"
-        exit 1
-    else
-        echo -e "${GREEN}>>> 服务器公网 IP: $PUBLIC_IP${NC}"
-    fi
-}
-
-# 生成自签名证书，直到用户输入有效密码
-function generate_ssl_certificate() {
-    echo -e "${YELLOW}>>> 生成自签名 SSL 证书...${NC}"
-
-    while true; do
-        read -rp "请输入要为证书设置的密码（至少6位）: " keystore_password
-
-        if [ ${#keystore_password} -lt 6 ];then
-            echo -e "${RED}>>> 密码太短，至少需要6位字符。请重新输入。${NC}"
-        else
-            break
-        fi
-    done
-
-    # 获取服务器的公网 IP
-    get_public_ip
-
-    keytool -genkeypair -alias sillytavern -keyalg RSA -keysize 2048 -keystore "$KEYSTORE_FILE" -validity 365 \
-        -storepass "$keystore_password" -keypass "$keystore_password" \
-        -dname "CN=$PUBLIC_IP, OU=SillyTavern, O=SillyTavern, L=City, S=State, C=US"
-
-    if [ $? -ne 0 ];then
-        echo -e "${RED}>>> 证书生成失败${NC}"
-        exit 1
-    fi
-
-    echo -e "${GREEN}>>> 证书生成成功并保存在: $KEYSTORE_FILE${NC}"
-
-    # 配置 application.properties 文件
-    configure_application_properties "$keystore_password"
-}
-
-# 配置 application.properties 文件，启用 HTTPS
-function configure_application_properties() {
-    keystore_password=$1
-
-    echo -e "${YELLOW}>>> 配置 application.properties 文件...${NC}"
-    
-    # 更新 application.properties 文件中的 SSL 配置
-    sed -i "s/server.ssl.key-store-password=.*/server.ssl.key-store-password=$keystore_password/" "$APPLICATION_PROPERTIES_FILE"
-    sed -i "s/server.ssl.key-password=.*/server.ssl.key-password=$keystore_password/" "$APPLICATION_PROPERTIES_FILE"
-    
-    echo -e "${GREEN}>>> application.properties 配置已更新${NC}"
-}
-
 # 放行端口
 function allow_port() {
-    echo -e "${YELLOW}>>> 放行 8443 端口...${NC}"
+    echo -e "${YELLOW}>>> 放行 $DEFAULT_PORT 端口...${NC}"
     
     if command -v ufw &> /dev/null; then
         # 使用 ufw
-        sudo ufw allow 8443/tcp
-        echo -e "${GREEN}>>> 8443 端口已成功放行。${NC}"
+        sudo ufw allow "$DEFAULT_PORT"/tcp
+        echo -e "${GREEN}>>> $DEFAULT_PORT 端口已成功放行。${NC}"
     elif command -v firewall-cmd &> /dev/null; then
         # 使用 firewalld
-        sudo firewall-cmd --zone=public --add-port=8443/tcp --permanent
+        sudo firewall-cmd --zone=public --add-port="$DEFAULT_PORT"/tcp --permanent
         sudo firewall-cmd --reload
-        echo -e "${GREEN}>>> 8443 端口已成功放行。${NC}"
+        echo -e "${GREEN}>>> $DEFAULT_PORT 端口已成功放行。${NC}"
     else
         echo -e "${RED}>>> 未检测到可用的防火墙工具，请手动放行端口。${NC}"
-    fi
-}
-
-# 使用 Spring Security 的 BCryptPasswordEncoder 来加密密码
-function encrypt_password() {
-    password=$1
-    # 使用 Java 来执行 BCrypt 加密
-    ENCRYPTED_PASSWORD=$(java -cp "target/classes:target/dependency/*" org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder "$password")
-    echo "$ENCRYPTED_PASSWORD"
-}
-
-# 更新 application.properties 文件中的用户名和加密后的密码
-function update_login_credentials() {
-    read -rp "请输入新的用户名: " username
-
-    while true; do
-        echo -n "请输入新的密码: "
-        password=$(hidden_password_input)
-        echo
-
-        echo -n "请确认新的密码: "
-        confirm_password=$(hidden_password_input)
-        echo
-
-        if [[ "$password" == "$confirm_password" ]]; then
-            echo -e "${GREEN}>>> 密码已确认。${NC}"
-            break
-        else
-            echo -e "${RED}>>> 两次输入的密码不一致，请重新输入。${NC}"
-        fi
-    done
-
-    # 使用 Java 来加密密码
-    encrypted_password=$(encrypt_password "$password")
-
-    if [ -f "$APPLICATION_PROPERTIES_FILE" ];then
-        echo -e "${YELLOW}>>> 正在修改 application.properties 中的用户名和密码...${NC}"
-
-        # 更新 application.properties 中的用户名和密码
-        sed -i "s/^app.security.username=.*/app.security.username=$username/" "$APPLICATION_PROPERTIES_FILE"
-        sed -i "s/^app.security.password=.*/app.security.password=$encrypted_password/" "$APPLICATION_PROPERTIES_FILE"
-
-        echo -e "${GREEN}>>> 用户名和密码已成功更新！${NC}"
-
-        # 自动重启 Spring Boot 应用以应用新的配置
-        echo -e "${YELLOW}>>> 重启服务以应用新配置...${NC}"
-        sudo systemctl restart "$APP_NAME"
-        echo -e "${GREEN}>>> 服务已成功重启，修改后的用户名和密码已生效！${NC}"
-    else
-        echo -e "${RED}>>> 找不到 application.properties 文件。${NC}"
     fi
 }
 
@@ -221,7 +114,7 @@ After=network.target
 [Service]
 User=root
 WorkingDirectory=/root/'"$PROJECT_NAME"'
-ExecStart=/usr/bin/java -jar /root/'"$PROJECT_NAME"'/'"$JAR_FILE"' > /var/log/'"$APP_NAME"'.log 2>&1
+ExecStart=/usr/bin/java -jar /root/'"$PROJECT_NAME"'/'"$JAR_FILE"' --server.port='"$DEFAULT_PORT"' > /var/log/'"$APP_NAME"'.log 2>&1
 SuccessExitStatus=143
 TimeoutStopSec=10
 Restart=always
@@ -250,6 +143,29 @@ function check_service_status() {
     sudo systemctl status "$APP_NAME"
 }
 
+# 查看服务后台日志
+function view_service_logs() {
+    echo -e "${YELLOW}>>> 查看服务日志...${NC}"
+    sudo journalctl -u "$APP_NAME" -f
+}
+
+# 完全卸载服务
+function uninstall_service() {
+    echo -e "${YELLOW}>>> 正在停止服务...${NC}"
+    sudo systemctl stop "$APP_NAME"
+    
+    echo -e "${YELLOW}>>> 正在禁用服务...${NC}"
+    sudo systemctl disable "$APP_NAME"
+
+    echo -e "${YELLOW}>>> 删除 systemd 服务文件...${NC}"
+    sudo rm -f "$SERVICE_FILE"
+    
+    echo -e "${YELLOW}>>> 删除项目文件...${NC}"
+    sudo rm -rf "/root/$PROJECT_NAME"
+
+    echo -e "${GREEN}>>> 服务已完全卸载。${NC}"
+}
+
 # 更新脚本并安全覆盖旧脚本
 function update_script() {
     echo -e "${YELLOW}>>> 正在检查脚本更新...${NC}"
@@ -266,12 +182,13 @@ function update_script() {
     fi
 }
 
-# 检查是否已部署，包括证书文件
+# 检查是否已部署
 function is_deployed() {
-    if [ -d "$PROJECT_NAME" ] && [ -f "$SERVICE_FILE" ] && [ -f "$KEYSTORE_FILE" ];then
+    # 检查是否有构建好的 JAR 文件和 systemd 服务文件
+    if [ -f "$SERVICE_FILE" ] && [ -n "$(find target -name '*.jar')" ]; then
         return 0  # 已部署
     else
-        return 1  # 未部署或证书缺失
+        return 1  # 未部署
     fi
 }
 
@@ -281,13 +198,13 @@ function deploy_project() {
     retry_function install_dependencies
     check_installation
     retry_function update_project
-    retry_function generate_ssl_certificate  # 生成 SSL 证书并配置 HTTPS
-    retry_function allow_port  # 放行 8443 端口
+    retry_function allow_port  # 放行 $DEFAULT_PORT 端口
     retry_function build_project
     find_latest_jar
     setup_service
     start_or_restart_service
     check_service_status
+    echo -e "${GREEN}>>> 初次部署完成。${NC}"
 }
 
 # 显示菜单并获取用户选择
@@ -295,17 +212,18 @@ function show_menu() {
     echo -e "${BLUE}╔══════════════════════════════════════════════════╗${NC}"
     echo -e "${BLUE}║               ${GREEN}请选择一个操作${NC}${BLUE}                    ║${NC}"
     echo -e "${BLUE}╠══════════════════════════════════════════════════╣${NC}"
-    echo -e "${BLUE}║${NC} （1）启动/重启加密服务${BLUE}                            ║${NC}"
+    echo -e "${BLUE}║${NC} （1）启动/重启服务${BLUE}                             ║${NC}"
     echo -e "${BLUE}║${NC} （2）更新项目管理脚本${BLUE}                          ║${NC}"
-    echo -e "${BLUE}║${NC} （3）更新加密服务${BLUE}                                ║${NC}"
-    echo -e "${BLUE}║${NC} （4）修改管理员用户名和密码${BLUE}                    ║${NC}"
+    echo -e "${BLUE}║${NC} （3）更新服务${BLUE}                                 ║${NC}"
+    echo -e "${BLUE}║${NC} （4）查看服务后台日志${BLUE}                          ║${NC}"
+    echo -e "${BLUE}║${NC} （5）卸载服务${BLUE}                                 ║${NC}"
     echo -e "${BLUE}╠══════════════════════════════════════════════════╣${NC}"
     echo -e "${BLUE}║${RED} （0）退出${NC}${BLUE}                                      ║${NC}"
     echo -e "${BLUE}╚══════════════════════════════════════════════════╝${NC}"
-    read -rp "$(echo -e "${BLUE}输入你的选择 [0-4]: ${NC}")" choice
+    read -rp "$(echo -e "${BLUE}输入你的选择 [0-5]: ${NC}")" choice
     case $choice in
         1)
-            echo -e "${YELLOW}>>> 你选择了启动/重启加密服务${NC}"
+            echo -e "${YELLOW}>>> 你选择了启动/重启服务${NC}"
             retry_function start_or_restart_service
             check_service_status
             ;;
@@ -314,7 +232,7 @@ function show_menu() {
             retry_function update_script
             ;;
         3)
-            echo -e "${YELLOW}>>> 你选择了更新加密服务${NC}"
+            echo -e "${YELLOW}>>> 你选择了更新服务${NC}"
             retry_function update_project
             retry_function build_project
             find_latest_jar
@@ -323,8 +241,12 @@ function show_menu() {
             check_service_status
             ;;
         4)
-            echo -e "${YELLOW}>>> 你选择了修改管理员用户名和密码${NC}"
-            update_login_credentials
+            echo -e "${YELLOW}>>> 你选择了查看服务后台日志${NC}"
+            view_service_logs
+            ;;
+        5)
+            echo -e "${RED}>>> 你选择了卸载服务${NC}"
+            uninstall_service
             ;;
         0)
             echo -e "${RED}>>> 退出脚本${NC}"
@@ -336,7 +258,7 @@ function show_menu() {
     esac
 }
 
-# 主流程：检查是否已部署，包括证书文件
+# 主流程：检查是否已部署
 show_header
 if is_deployed; then
     echo -e "${GREEN}>>> 项目已部署。${NC}"
@@ -346,4 +268,7 @@ if is_deployed; then
 else
     echo -e "${YELLOW}>>> 项目尚未部署，开始部署流程...${NC}"
     deploy_project  # 如果项目尚未部署，执行完整的部署流程
+    while true; do  # 部署完成后进入主菜单
+        show_menu
+    done
 fi
