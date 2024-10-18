@@ -98,7 +98,7 @@ function build_project() {
 
 # 找到最新的 JAR 文件
 function find_latest_jar() {
-    JAR_FILE=$(find target -name "*.jar" | head -n 1)
+    JAR_FILE=$(find $PROJECT_NAME/target -name "*.jar" | head -n 1)
     echo -e "${GREEN}>>> 找到的 JAR 文件: $JAR_FILE${NC}"
 }
 
@@ -185,7 +185,7 @@ function update_script() {
 # 检查是否已部署
 function is_deployed() {
     # 检查是否有构建好的 JAR 文件和 systemd 服务文件
-    if [ -f "$SERVICE_FILE" ] && [ -n "$(find target -name '*.jar')" ]; then
+    if [ -f "$SERVICE_FILE" ] && [ -n "$(find $PROJECT_NAME/target -name '*.jar')" ]; then
         return 0  # 已部署
     else
         return 1  # 未部署
