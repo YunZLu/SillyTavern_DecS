@@ -15,8 +15,7 @@ import reactor.core.publisher.Mono;
 import javax.annotation.PostConstruct;
 import javax.crypto.Cipher;
 import javax.xml.bind.DatatypeConverter;
-import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.*;
 import java.security.NoSuchAlgorithmException;
@@ -57,71 +56,72 @@ public class AsyncController {
     private final String claudeUrl = "https://claude-url.com";
     private final String clewdUrl = "https://clewd-url.com"; // clewd对应的URL
 
-    private File configFilePath;  // 配置文件路径
-
     @PostConstruct
     public void init() {
-        configFilePath = getConfigFile(); // 获取外部或内部配置文件路径
         reloadConfig(); // 从config.json加载配置
         startWatchService(); // 启动WatchService监控config.json文件变化
     }
 
-private File getConfigFile() {
-    // 优先检查环境变量或系统属性中的路径
-    String configPath = System.getenv("CONFIG_JSON_PATH");
-    if (configPath == null || configPath.isEmpty()) {
-        configPath = System.getProperty("config.json.path");
-    }
-
-    // 如果提供了外部路径，优先使用
-    if (configPath != null && !configPath.isEmpty()) {
-        File externalConfig = new File(configPath);
-        if (externalConfig.exists() && externalConfig.isFile()) {
-            logger.info("加载外部配置文件: {}", externalConfig.getAbsolutePath());
-            return externalConfig;
+    private InputStream getConfigFileStream() {
+        // 优先检查环境变量或系统属性中的路径
+        String configPath = System.getenv("CONFIG_JSON_PATH");
+        if (configPath == null || configPath.isEmpty()) {
+            configPath = System.getProperty("config.json.path");
         }
-    }
 
-    // 尝试通过ClassLoader加载JAR包中的配置文件
-    ClassLoader classLoader = getClass().getClassLoader();
-    try {
-        // 从资源路径加载config.json
-        File internalConfig = new File(classLoader.getResource("config.json").toURI());
-        if (internalConfig.exists() && internalConfig.isFile()) {
-            logger.info("加载内部配置文件: {}", internalConfig.getAbsolutePath());
-            return internalConfig;
+        // 如果提供了外部路径，优先使用
+        if (configPath != null && !configPath.isEmpty()) {
+            File externalConfig = new File(configPath);
+            if (externalConfig.exists() && externalConfig.isFile()) {
+                logger.info("加载外部配置文件: {}", externalConfig.getAbsolutePath());
+                try {
+                    return new FileInputStream(externalConfig);
+                } catch (FileNotFoundException e) {
+                    logger.error("无法加载外部配置文件: {}", e.getMessage());
+                }
+            }
         }
-    } catch (Exception e) {
-        logger.error("加载内部配置文件时发生错误: {}", e.getMessage());
-    }
 
-    // 如果没有找到配置文件，抛出异常
-    throw new IllegalStateException("配置文件不存在或无效。");
-}
+        // 尝试通过ClassLoader加载JAR包中的配置文件
+        ClassLoader classLoader = getClass().getClassLoader();
+        InputStream inputStream = classLoader.getResourceAsStream("config.json");
+        if (inputStream != null) {
+            logger.info("成功加载内部配置文件");
+            return inputStream;
+        }
+
+        // 如果没有找到配置文件，抛出异常
+        throw new IllegalStateException("配置文件不存在或无效。");
+    }
 
     // 启动WatchService，监听config.json文件的变化
     private void startWatchService() {
         try {
-            WatchService watchService = FileSystems.getDefault().newWatchService();
-            Path configDir = configFilePath.getParentFile().toPath();
-            configDir.register(watchService, StandardWatchEventKinds.ENTRY_MODIFY);
+            File configFilePath = new File(System.getenv("CONFIG_JSON_PATH") != null ? System.getenv("CONFIG_JSON_PATH") : "src/main/resources/config.json");
+            if (configFilePath.exists()) {
+                WatchService watchService = FileSystems.getDefault().newWatchService();
+                Path configDir = configFilePath.getParentFile().toPath();
+                configDir.register(watchService, StandardWatchEventKinds.ENTRY_MODIFY);
 
-            new Thread(() -> {
-                while (true) {
-                    try {
-                        WatchKey key = watchService.take();
-                        for (WatchEvent<?> event : key.pollEvents()) {
-                            if (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY && configFilePath.getName().equals(event.context().toString())) {
-                                logger.info("检测到 config.json 文件更新，重新加载配置");
-                                reloadConfig();
+                new Thread(() -> {
+                    while (true) {
+                        try {
+                            WatchKey key = watchService.take();
+                            for (WatchEvent<?> event : key.pollEvents()) {
+                                if (event.kind() == StandardWatchEventKinds.ENTRY_MODIFY && configFilePath.getName().equals(event.context().toString())) {
+                                    logger.info("检测到 config.json 文件更新，重新加载配置");
+                                    reloadConfig();
+                                }
                             }
+                            key.reset();
+                        } catch (Exception e) {
+                            logger.error("文件监控发生错误: {}", e.getMessage());
                         }
-                        key.reset();
-                    } catch (Exception e) {
-                        logger.error("文件监控发生错误: {}", e.getMessage());
                     }
-                }
-            }).start();
+                }).start();
+            } else {
+                logger.warn("无法启动WatchService，外部配置文件路径无效");
+            }
         } catch (IOException e) {
             logger.error("启动WatchService失败: {}", e.getMessage());
         }
@@ -129,19 +129,19 @@ private File getConfigFile() {
 
     // 重新加载配置，并仅在私钥更改时清空缓存
     public void reloadConfig() {
-        try {
+        try (InputStream configStream = getConfigFileStream()) {
             ObjectMapper objectMapper = new ObjectMapper();
-            Map<String, Object> config = objectMapper.readValue(configFilePath, Map.class);
-    
+            Map<String, Object> config = objectMapper.readValue(configStream, Map.class);
+
             // 加载新私钥
             String privateKeyString = (String) config.get("privateKey");
             byte[] keyBytes = Base64.getDecoder().decode(privateKeyString);
-    
+
             try {
                 PKCS8EncodedKeySpec spec = new PKCS8EncodedKeySpec(keyBytes);
                 KeyFactory kf = KeyFactory.getInstance("RSA");
                 PrivateKey newPrivateKey = kf.generatePrivate(spec);
-    
+
                 // 仅在私钥变化时清空缓存
                 if (!newPrivateKey.equals(privateKey)) {
                     privateKey = newPrivateKey;
@@ -152,11 +152,11 @@ private File getConfigFile() {
                 logger.error("加载私钥时发生错误: {}", e.getMessage());
                 return; // 处理异常时可以根据实际需求决定是否继续加载其他配置
             }
-    
+
             // 更新其他配置
             whitelist = (List<String>) config.get("whitelist");
             maxIPConcurrentRequests = (int) config.get("maxConcurrentRequestsPerIP");
-    
+
             logger.info("配置已成功从 config.json 文件加载");
         } catch (IOException e) {
             logger.error("加载 config.json 文件时发生错误，将继续使用上次的配置: {}", e.getMessage());
