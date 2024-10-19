@@ -132,7 +132,7 @@ function set_private_key() {
     local current_private_key
     current_private_key=$(jq -r '.privateKey' "$CONFIG_PATH")
 
-    echo -e "${YELLOW}当前私钥: ${current_private_key:0:30}...(已隐藏)${NC}"
+    echo -e "${YELLOW}当前私钥: ${current_private_key:0:50}...(已隐藏)${NC}"
     echo -e "${YELLOW}请输入新的私钥内容（多行输入，按 Ctrl+D 完成输入）:${NC}"
 
     # 捕获多行输入的私钥，保留换行符
