@@ -345,18 +345,18 @@ function update_script() {
 # 显示菜单并获取用户选择
 function show_menu() {
     echo -e "${BLUE}╔══════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║                     ${GREEN}主菜单${NC}${BLUE}                      ║${NC}"
+    echo -e "${BLUE}║                     ${GREEN}主菜单${NC}${BLUE}                       ║${NC}"
     echo -e "${BLUE}╠══════════════════════════════════════════════════╣${NC}"
-    echo -e "${BLUE}║${NC} （1）启动/重启服务        ${BLUE}                      ║${NC}"
-    echo -e "${BLUE}║${NC} （2）查看服务日志        ${BLUE}                       ║${NC}"
+    echo -e "${BLUE}║${NC} （1）启动/重启服务        ${BLUE}                       ║${NC}"
+    echo -e "${BLUE}║${NC} （2）查看服务日志        ${BLUE}                        ║${NC}"
     echo -e "${BLUE}║${NC} （3）设置白名单          ${BLUE}                        ║${NC}"
     echo -e "${BLUE}║${NC} （4）设置同IP并发限制     ${BLUE}                       ║${NC}"
-    echo -e "${BLUE}║${NC} （5）设置私钥            ${BLUE}                      ║${NC}"
-    echo -e "${BLUE}║${NC} （6）更新项目管理脚本      ${BLUE}                       ║${NC}"
-    echo -e "${BLUE}║${NC} （7）安装/更新服务        ${BLUE}                      ║${NC}"
-    echo -e "${BLUE}║${NC} （8）完全卸载服务         ${BLUE}                      ║${NC}"
+    echo -e "${BLUE}║${NC} （5）设置私钥            ${BLUE}                        ║${NC}"
+    echo -e "${BLUE}║${NC} （6）更新项目管理脚本      ${BLUE}                      ║${NC}"
+    echo -e "${BLUE}║${NC} （7）安装/更新服务        ${BLUE}                       ║${NC}"
+    echo -e "${BLUE}║${NC} （8）完全卸载服务         ${BLUE}                       ║${NC}"
     echo -e "${BLUE}╠══════════════════════════════════════════════════╣${NC}"
-    echo -e "${BLUE}║${RED} （0）退出                ${BLUE}                       ║${NC}"
+    echo -e "${BLUE}║${RED} （0）退出                ${BLUE}                        ║${NC}"
     echo -e "${BLUE}╚══════════════════════════════════════════════════╝${NC}"
     read -rp "$(echo -e "${BLUE}输入你的选择 [0-8]: ${NC}")" choice
 
