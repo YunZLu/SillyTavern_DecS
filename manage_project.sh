@@ -333,8 +333,8 @@ function update_script() {
     if [ $? -eq 0 ]; then
         echo -e "${GREEN}>>> 脚本已更新成功，正在重启脚本...${NC}"
         chmod +x "$TEMP_SCRIPT"
-        mv "$TEMP_SCRIPT" "$0"
-        exec "$0"
+        mv "$TEMP_SCRIPT" /root/manage_project.sh
+        exec /root/manage_project.sh
     else
         echo -e "${RED}>>> 脚本更新失败，保留原脚本。请检查网络连接。${NC}"
         rm -f "$TEMP_SCRIPT"
