@@ -290,6 +290,10 @@ public class AsyncController {
     }
     
     private String resolveTargetUrl(String urlOrParam) {
+        if (urlOrParam.startsWith("url:")) {
+            logger.warn("检测到url前缀，可能是无效路径: {}", urlOrParam);
+            urlOrParam = urlOrParam.substring(4); // 移除 'url:' 前缀
+        }
         return switch (urlOrParam.toLowerCase()) {
             case "claude" -> claudeUrl;
             case "clewd" -> clewdUrl;
