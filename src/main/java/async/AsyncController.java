@@ -238,7 +238,7 @@ public class AsyncController {
     }
 
     @PostMapping("/**")
-    public Flux<DataBuffer> captureAndForward(HttpServletRequest request,
+    public Flux<DataBuffer> captureAndForward(ServerHttpRequest request,
                                               @RequestBody RequestBodyData requestBodyData,
                                               @RequestHeader HttpHeaders headers,
                                               @RequestHeader(value = "X-Forwarded-For", defaultValue = "localhost") String clientIp) {
