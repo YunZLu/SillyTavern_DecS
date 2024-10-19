@@ -9,7 +9,7 @@ SCRIPT_URL="https://raw.githubusercontent.com/YunZLu/SillyTavern_DecS/refs/heads
 CONFIG_PATH="/etc/$APP_NAME/config.json"
 
 # 更改默认的服务端口，避免使用常用的 8080 端口
-DEFAULT_PORT=8445
+DEFAULT_PORT=5050
 
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
