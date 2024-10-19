@@ -343,7 +343,7 @@ function update_script() {
 
 # 显示菜单并获取用户选择
 function show_menu() {
-    echo -e "\n"
+    echo -e ""
     echo -e "${BLUE}╔══════════════════════════════════════════════════╗${NC}"
     echo -e "${BLUE}║                     ${GREEN}主菜单${NC}${BLUE}                       ║${NC}"
     echo -e "${BLUE}╠══════════════════════════════════════════════════╣${NC}"
