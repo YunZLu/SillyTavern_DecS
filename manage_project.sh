@@ -125,6 +125,7 @@ function set_concurrent_requests() {
     read -rp "请输入新的同IP并发请求限制: " new_limit
     jq '.maxConcurrentRequestsPerIP = '"$new_limit" "$CONFIG_PATH" > tmp.$$.json && mv tmp.$$.json "$CONFIG_PATH"
     echo -e "${GREEN}同IP并发请求限制已更新！${NC}"
+    touch "$CONFIG_PATH"
 }
 
 # 修改私钥
@@ -142,6 +143,7 @@ function set_private_key() {
     jq --arg privateKey "$private_key" '.privateKey = $privateKey' "$CONFIG_PATH" > tmp.$$.json && mv tmp.$$.json "$CONFIG_PATH"
     
     echo -e "${GREEN}私钥已更新！${NC}"
+    touch "$CONFIG_PATH"
 }
 
 # 白名单设置页面
@@ -193,6 +195,7 @@ function add_whitelist() {
     read -rp "请输入要增加的白名单 URL: " new_entry
     jq '.whitelist += ["'"$new_entry"'"]' "$CONFIG_PATH" > tmp.$$.json && mv tmp.$$.json "$CONFIG_PATH"
     echo -e "${GREEN}白名单已增加: $new_entry${NC}"
+    touch "$CONFIG_PATH"
 }
 
 # 删除白名单
@@ -201,6 +204,7 @@ function delete_whitelist() {
     read -rp "请输入要删除的白名单项编号: " number
     jq '.whitelist |= del(.[('"$number"'-1)])' "$CONFIG_PATH" > tmp.$$.json && mv tmp.$$.json "$CONFIG_PATH"
     echo -e "${GREEN}白名单项已删除${NC}"
+    touch "$CONFIG_PATH"
 }
 
 # 修改白名单
@@ -210,6 +214,7 @@ function modify_whitelist() {
     read -rp "请输入新的白名单 URL: " new_entry
     jq '.whitelist['"$number"'-1] = "'"$new_entry"'"' "$CONFIG_PATH" > tmp.$$.json && mv tmp.$$.json "$CONFIG_PATH"
     echo -e "${GREEN}白名单已修改为: $new_entry${NC}"
+    touch "$CONFIG_PATH"
 }
 
 # 更新 systemd 服务文件
