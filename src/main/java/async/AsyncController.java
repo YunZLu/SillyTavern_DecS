@@ -276,7 +276,7 @@ public class AsyncController {
                 }
             })
             .thenMany(webClient.post()
-                .uri(targetUrl)
+                .uri(URI.create(targetUrl))
                 .headers(httpHeaders -> httpHeaders.addAll(filteredHeaders))
                 .bodyValue(requestBodyData)  // 将更新后的 message 发送出去
                 .retrieve()
