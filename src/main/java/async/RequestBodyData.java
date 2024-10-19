@@ -7,12 +7,12 @@ public class RequestBodyData {
     private List<Message> messages;
     private String model;  // 可选字段
     private Double temperature;  // 可选字段
-    private Integer maxTokens;  // 可选字段，使用驼峰命名法
+    private Integer max_tokens;  // 字段名与 JSON 保持一致
     private Boolean stream;  // 可选字段
-    private Double presencePenalty;  // 可选字段
-    private Double frequencyPenalty;  // 可选字段
-    private Double topP;  // 可选字段
-    private Map<String, Integer> logitBias;  // 可选字段，Map 也可以为 null
+    private Double presence_penalty;  // 字段名与 JSON 保持一致
+    private Double frequency_penalty;  // 字段名与 JSON 保持一致
+    private Double top_p;  // 字段名与 JSON 保持一致
+    private Map<String, Integer> logit_bias;  // 字段名与 JSON 保持一致
 
     // Getter 和 Setter 方法
     public List<Message> getMessages() {
@@ -39,12 +39,12 @@ public class RequestBodyData {
         this.temperature = temperature;
     }
 
-    public Integer getMaxTokens() {
-        return maxTokens;
+    public Integer getMax_tokens() {
+        return max_tokens;
     }
 
-    public void setMaxTokens(Integer maxTokens) {
-        this.maxTokens = maxTokens;
+    public void setMax_tokens(Integer max_tokens) {
+        this.max_tokens = max_tokens;
     }
 
     public Boolean getStream() {
@@ -55,36 +55,36 @@ public class RequestBodyData {
         this.stream = stream;
     }
 
-    public Double getPresencePenalty() {
-        return presencePenalty;
+    public Double getPresence_penalty() {
+        return presence_penalty;
     }
 
-    public void setPresencePenalty(Double presencePenalty) {
-        this.presencePenalty = presencePenalty;
+    public void setPresence_penalty(Double presence_penalty) {
+        this.presence_penalty = presence_penalty;
     }
 
-    public Double getFrequencyPenalty() {
-        return frequencyPenalty;
+    public Double getFrequency_penalty() {
+        return frequency_penalty;
     }
 
-    public void setFrequencyPenalty(Double frequencyPenalty) {
-        this.frequencyPenalty = frequencyPenalty;
+    public void setFrequency_penalty(Double frequency_penalty) {
+        this.frequency_penalty = frequency_penalty;
     }
 
-    public Double getTopP() {
-        return topP;
+    public Double getTop_p() {
+        return top_p;
     }
 
-    public void setTopP(Double topP) {
-        this.topP = topP;
+    public void setTop_p(Double top_p) {
+        this.top_p = top_p;
     }
 
-    public Map<String, Integer> getLogitBias() {
-        return logitBias;
+    public Map<String, Integer> getLogit_bias() {
+        return logit_bias;
     }
 
-    public void setLogitBias(Map<String, Integer> logitBias) {
-        this.logitBias = logitBias;
+    public void setLogit_bias(Map<String, Integer> logit_bias) {
+        this.logit_bias = logit_bias;
     }
 
     // 增加 toString() 方法，便于日志输出
@@ -94,12 +94,12 @@ public class RequestBodyData {
                 "messages=" + messages +
                 ", model='" + model + '\'' +
                 ", temperature=" + temperature +
-                ", maxTokens=" + maxTokens +
+                ", max_tokens=" + max_tokens +
                 ", stream=" + stream +
-                ", presencePenalty=" + presencePenalty +
-                ", frequencyPenalty=" + frequencyPenalty +
-                ", topP=" + topP +
-                ", logitBias=" + logitBias +
+                ", presence_penalty=" + presence_penalty +
+                ", frequency_penalty=" + frequency_penalty +
+                ", top_p=" + top_p +
+                ", logit_bias=" + logit_bias +
                 '}';
     }
 }
