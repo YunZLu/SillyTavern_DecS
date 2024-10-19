@@ -29,6 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.springframework.http.server.reactive.ServerHttpRequest;
+import javax.servlet.http.HttpServletRequest;
 
 @RestController
 public class AsyncController {
@@ -238,7 +239,7 @@ public class AsyncController {
     }
 
     @PostMapping("/**")
-    public Flux<DataBuffer> captureAndForward(ServerHttpRequest request,
+    public Flux<DataBuffer> captureAndForward(HttpServletRequest request,
                                               @RequestBody RequestBodyData requestBodyData,
                                               @RequestHeader HttpHeaders headers,
                                               @RequestHeader(value = "X-Forwarded-For", defaultValue = "localhost") String clientIp) {
