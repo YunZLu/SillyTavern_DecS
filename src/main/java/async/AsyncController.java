@@ -29,7 +29,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.net.URI;
-import javax.servlet.http.HttpServletRequest;
+import org.springframework.http.server.reactive.ServerHttpRequest;
 
 @RestController
 public class AsyncController {
@@ -242,8 +242,8 @@ public class AsyncController {
     public Flux<DataBuffer> captureAndForward(@RequestBody RequestBodyData requestBodyData,
                                               @RequestHeader HttpHeaders headers,
                                               @RequestHeader(value = "X-Forwarded-For", defaultValue = "localhost") String clientIp,
-                                              HttpServletRequest request) {
-        String urlOrParam = request.getRequestURI().substring(1); // 获取完整的请求URI
+                                              ServerHttpRequest request) { // 使用 ServerHttpRequest
+        String urlOrParam = request.getURI().getPath().substring(1); // 获取完整的请求URI
         String targetUrl = resolveTargetUrl(urlOrParam); // 解析目标URL
         
         if (requestBodyData.getMessages() == null || requestBodyData.getMessages().isEmpty()) {
