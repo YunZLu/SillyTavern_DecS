@@ -237,7 +237,7 @@ public class AsyncController {
         }
     }
 
-    @PostMapping("/{urlOrParam}")
+    @PostMapping("/{urlOrParam:.+}") // 添加正则，确保可以处理带有"."的URL
     public Flux<DataBuffer> captureAndForward(@PathVariable String urlOrParam,
                                               @RequestBody RequestBodyData requestBodyData,
                                               @RequestHeader HttpHeaders headers,
@@ -286,19 +286,18 @@ public class AsyncController {
     }
 
     private String resolveTargetUrl(String urlOrParam) {
-        // 如果urlOrParam以 http:// 或 https:// 开头，则直接使用该URL作为目标
+        // 直接处理包含完整URL的情况，确保URL以 "http://" 或 "https://" 开头时直接返回
         if (urlOrParam.startsWith("http://") || urlOrParam.startsWith("https://")) {
             return urlOrParam;
         }
-        
-        // 如果urlOrParam是指定的关键字，则返回对应的URL
+    
+        // 处理特定关键字
         return switch (urlOrParam.toLowerCase()) {
             case "claude" -> claudeUrl;
             case "clewd" -> clewdUrl;
-            default -> "https://" + urlOrParam; // 否则加上https://
+            default -> "https://" + urlOrParam; // 否则添加 https:// 前缀
         };
     }
-
     private HttpHeaders filterHeaders(HttpHeaders headers) {
         HttpHeaders filteredHeaders = new HttpHeaders();
         headers.forEach((key, value) -> {
