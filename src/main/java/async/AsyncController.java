@@ -290,16 +290,24 @@ public class AsyncController {
     }
     
     private String resolveTargetUrl(String urlOrParam) {
-        if (urlOrParam.startsWith("url:")) {
-            logger.warn("检测到url前缀，可能是无效路径: {}", urlOrParam);
-            urlOrParam = urlOrParam.substring(4); // 移除 'url:' 前缀
+        // 如果 urlOrParam 是一个完整的 HTTP/HTTPS URL 直接返回
+        if (urlOrParam.startsWith("http://") || urlOrParam.startsWith("https://")) {
+            return urlOrParam;  // 直接返回目标地址
         }
+    
+        // 如果存在url前缀，移除它
+        if (urlOrParam.startsWith("url:")) {
+            urlOrParam = urlOrParam.substring(4);  // 移除 'url:' 前缀
+        }
+    
+        // 处理常见的别名映射
         return switch (urlOrParam.toLowerCase()) {
             case "claude" -> claudeUrl;
             case "clewd" -> clewdUrl;
             default -> urlOrParam.startsWith("http") ? urlOrParam : "https://" + urlOrParam;
         };
     }
+
 
     private HttpHeaders filterHeaders(HttpHeaders headers) {
         HttpHeaders filteredHeaders = new HttpHeaders();
