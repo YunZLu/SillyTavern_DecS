@@ -420,7 +420,7 @@ function show_menu() {
 # 主流程：检查是否已部署
 show_header
 if is_deployed; then
-    echo -e "${GREEN}>>> 项目已部署。${NC}"
+    echo -e "\n${GREEN}>>> 项目已部署。${NC}"
     while true; do
         show_menu
     done
