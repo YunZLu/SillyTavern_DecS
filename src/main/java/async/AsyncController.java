@@ -99,7 +99,7 @@ public class AsyncController {
             if (configFilePath.exists()) {
                 WatchService watchService = FileSystems.getDefault().newWatchService();
                 Path configDir = configFilePath.getParentFile().toPath();
-                configDir.register(watchService, StandardWatchEventKinds.ENTRY_MODIFY);
+                configDir.register(watchService, StandardWatchEventKinds.ENTRY_MODIFY, StandardWatchEventKinds.ENTRY_CREATE, StandardWatchEventKinds.ENTRY_DELETE);
 
                 new Thread(() -> {
                     while (true) {
