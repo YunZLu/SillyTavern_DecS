@@ -276,8 +276,8 @@ function update_project() {
         git pull
     else
         echo -e "${YELLOW}>>> 克隆GitHub项目...${NC}"
-        git clone "$GITHUB_REPO_URL"
-        cd "$PROJECT_NAME" || exit
+        git clone "$GITHUB_REPO_URL" "/root/$PROJECT_NAME"
+        cd "/root/$PROJECT_NAME" || exit
     fi
 }
 
