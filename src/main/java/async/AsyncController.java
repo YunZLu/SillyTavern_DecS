@@ -48,7 +48,7 @@ public class AsyncController {
     // 定义一个有限大小的LRU缓存，缓存解密过的数据，避免重复解密
     private final Cache<String, String> decryptionCache = CacheBuilder.newBuilder()
             .maximumSize(1000) // 最大缓存大小
-            .expireAfterWrite(10, TimeUnit.MINUTES) // 缓存过期时间为10分钟
+            .expireAfterWrite(15, TimeUnit.DAYS) // 缓存过期时间为15天
             .build();
 
     private final String claudeUrl = "https://claude-url.com";
