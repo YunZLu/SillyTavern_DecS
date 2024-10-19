@@ -243,9 +243,14 @@ public class AsyncController {
                                               @RequestHeader HttpHeaders headers,
                                               @RequestHeader(value = "X-Forwarded-For", defaultValue = "localhost") String clientIp,
                                               ServerHttpRequest request) {
-        // 解析原始的 URI，去掉前缀 "/"
-        String urlOrParam = request.getPath().pathWithinApplication().value().substring(1);
-        String targetUrl = resolveTargetUrl(urlOrParam);
+        // 从请求中提取完整的 URI，并去掉前缀 "/"
+        String path = request.getPath().pathWithinApplication().value();
+        String targetUrl = path.substring(1);  // 去掉前面的 "/"
+        
+        // 检查是否是合法的 URL
+        if (!targetUrl.startsWith("http://") && !targetUrl.startsWith("https://")) {
+            return Flux.error(new IllegalArgumentException("Invalid target URL"));
+        }
     
         if (requestBodyData.getMessages() == null || requestBodyData.getMessages().isEmpty()) {
             return Flux.error(new IllegalArgumentException("没有消息需要处理"));
@@ -257,7 +262,7 @@ public class AsyncController {
             return Flux.error(new IllegalArgumentException("来自该IP的并发请求过多"));
         }
     
-        // 转发到解析后的目标 URL
+        // 转发请求到解析出的目标 URL
         HttpHeaders filteredHeaders = filterHeaders(headers);
         logger.info("转发到目标URL: {}", targetUrl);
         logger.debug("转发的请求数据: {}", requestBodyData);
@@ -283,7 +288,6 @@ public class AsyncController {
                 .bodyToFlux(DataBuffer.class))
             .doFinally(signalType -> currentRequests.decrementAndGet());
     }
-
 
     private String resolveTargetUrl(String urlOrParam) {
         // 直接处理包含完整URL的情况，确保URL以 "http://" 或 "https://" 开头时直接返回
