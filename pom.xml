@@ -26,6 +26,7 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webflux</artifactId>
+            <version>${spring.boot.version}</version> <!-- 添加版本号 -->
         </dependency>
 
         <!-- Jackson 数据绑定 -->
@@ -79,6 +80,7 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>
+            <version>${spring.boot.version}</version> <!-- 添加版本号 -->
             <scope>test</scope>
         </dependency>
 
@@ -94,6 +96,7 @@
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-devtools</artifactId>
+            <version>${spring.boot.version}</version> <!-- 添加版本号 -->
             <scope>runtime</scope>
             <optional>true</optional>
         </dependency>
@@ -120,6 +123,7 @@
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>${spring.boot.version}</version> <!-- 添加版本号 -->
                 <executions>
                     <execution>
                         <goals>
