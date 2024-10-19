@@ -285,10 +285,14 @@ public class AsyncController {
     }
 
     private String resolveTargetUrl(String urlOrParam) {
+        if (urlOrParam.startsWith("http://") || urlOrParam.startsWith("https://")) {
+            // 如果urlOrParam已经是完整的URL，直接返回
+            return urlOrParam;
+        }
         return switch (urlOrParam.toLowerCase()) {
             case "claude" -> claudeUrl;
             case "clewd" -> clewdUrl;
-            default -> urlOrParam.startsWith("http") ? urlOrParam : "https://" + urlOrParam;
+            default -> "https://" + urlOrParam; // 否则加上https://
         };
     }
 
