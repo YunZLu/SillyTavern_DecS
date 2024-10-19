@@ -83,7 +83,7 @@ function allow_port() {
 
 # 检查是否已部署
 function is_deployed() {
-    if [ -f "$SERVICE_FILE" ] && [ -n "$(find $PROJECT_NAME/target -name '*.jar' 2>/dev/null)" ]; then
+    if [ -f "$SERVICE_FILE" ]; then
         return 0  # 已部署
     else
         return 1  # 未部署
@@ -265,8 +265,7 @@ function deploy_project() {
     set_private_key          # 提示用户修改私钥
     setup_service
     start_or_restart_service
-    echo -e "${GREEN}>>> 项目部署完成，重启脚本以生效最新配置...${NC}"
-    exec bash "$0"
+    echo -e "${GREEN}>>> 项目部署完成。${NC}"
 }
 
 # 克隆或更新项目
