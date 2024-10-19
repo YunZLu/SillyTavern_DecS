@@ -236,34 +236,47 @@ public class AsyncController {
         }
     }
 
-    @PostMapping("/{urlOrParam:.+}")
-    public Flux<DataBuffer> captureAndForward(@PathVariable String urlOrParam,
+    @PostMapping("/**")
+    public Flux<DataBuffer> captureAndForward(ServerHttpRequest request,
                                               @RequestBody RequestBodyData requestBodyData,
                                               @RequestHeader HttpHeaders headers,
                                               @RequestHeader(value = "X-Forwarded-For", defaultValue = "localhost") String clientIp) {
+        logger.info("captureAndForward 方法被调用"); // 确认方法被调用
+
+        // 提取路径并移除前导斜杠
+        String path = request.getURI().getPath();
+        if (path.startsWith("/")) {
+            path = path.substring(1);
+        }
+        String urlOrParam = path;
+
         logger.debug("接收到的请求URL: {}", urlOrParam); // 捕获URL
+
         if (requestBodyData.getMessages() == null || requestBodyData.getMessages().isEmpty()) {
+            logger.warn("没有消息需要处理");
             return Flux.error(new IllegalArgumentException("没有消息需要处理"));
         }
-    
+
         AtomicInteger currentRequests = ipRequestCount.computeIfAbsent(clientIp, k -> new AtomicInteger(0));
         if (currentRequests.incrementAndGet() > maxIPConcurrentRequests) {
             currentRequests.decrementAndGet(); // 减少并发数
+            logger.warn("来自IP {} 的并发请求过多", clientIp);
             return Flux.error(new IllegalArgumentException("来自该IP的并发请求过多"));
         }
-    
+
         String targetUrl = resolveTargetUrl(urlOrParam);
         logger.debug("解析的目标URL: {}", targetUrl); // 捕获解析后的目标URL
-    
+
         if (!whitelist.contains(targetUrl)) {
             currentRequests.decrementAndGet();
+            logger.warn("URL {} 不在白名单中", targetUrl);
             return Flux.error(new IllegalArgumentException("URL不在白名单中"));
         }
-    
+
         HttpHeaders filteredHeaders = filterHeaders(headers);
         logger.info("转发到目标URL: {}", targetUrl);
         logger.debug("转发的请求数据: {}", requestBodyData);
-    
+
         return Flux.fromIterable(requestBodyData.getMessages())
                 .flatMap(message -> {
                     try {
@@ -284,14 +297,11 @@ public class AsyncController {
                         .bodyValue(requestBodyData)  // 将更新后的 message 发送出去
                         .retrieve()
                         .bodyToFlux(DataBuffer.class))
-                .doFinally(signalType -> currentRequests.decrementAndGet());
+                .doFinally(signalType -> {
+                    currentRequests.decrementAndGet();
+                    logger.debug("请求处理完成，当前IP {} 并发请求数为 {}", clientIp, currentRequests.get());
+                });
     }
-    
-    private String resolveTargetUrl(String urlOrParam) {
-        // 如果 urlOrParam 是一个完整的 HTTP/HTTPS URL 直接返回
-        if (urlOrParam.startsWith("http://") || urlOrParam.startsWith("https://")) {
-            return urlOrParam;  // 直接返回目标地址
-        }
     
         // 如果存在url前缀，移除它
         if (urlOrParam.startsWith("url:")) {
