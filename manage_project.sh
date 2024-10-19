@@ -356,7 +356,7 @@ function show_menu() {
     echo -e "${BLUE}║${NC} （7）安装/更新服务        ${BLUE}                      ║${NC}"
     echo -e "${BLUE}║${NC} （8）完全卸载服务         ${BLUE}                      ║${NC}"
     echo -e "${BLUE}╠══════════════════════════════════════════════════╣${NC}"
-    echo -e "${BLUE}║${RED} （0）退出                ${BLUE}                    ║${NC}"
+    echo -e "${BLUE}║${RED} （0）退出                ${BLUE}                       ║${NC}"
     echo -e "${BLUE}╚══════════════════════════════════════════════════╝${NC}"
     read -rp "$(echo -e "${BLUE}输入你的选择 [0-8]: ${NC}")" choice
 
