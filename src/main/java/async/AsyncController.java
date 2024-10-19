@@ -241,26 +241,31 @@ public class AsyncController {
                                               @RequestBody RequestBodyData requestBodyData,
                                               @RequestHeader HttpHeaders headers,
                                               @RequestHeader(value = "X-Forwarded-For", defaultValue = "localhost") String clientIp) {
+        // 新增的调试日志
+        logger.debug("接收到的请求URL: {}", urlOrParam); // 捕获URL
+    
         if (requestBodyData.getMessages() == null || requestBodyData.getMessages().isEmpty()) {
             return Flux.error(new IllegalArgumentException("没有消息需要处理"));
         }
-
+    
         AtomicInteger currentRequests = ipRequestCount.computeIfAbsent(clientIp, k -> new AtomicInteger(0));
         if (currentRequests.incrementAndGet() > maxIPConcurrentRequests) {
             currentRequests.decrementAndGet(); // 减少并发数
             return Flux.error(new IllegalArgumentException("来自该IP的并发请求过多"));
         }
-
+    
         String targetUrl = resolveTargetUrl(urlOrParam);
+        logger.debug("解析的目标URL: {}", targetUrl); // 捕获解析后的目标URL
+    
         if (!whitelist.contains(targetUrl)) {
             currentRequests.decrementAndGet();
             return Flux.error(new IllegalArgumentException("URL不在白名单中"));
         }
-
+    
         HttpHeaders filteredHeaders = filterHeaders(headers);
         logger.info("转发到目标URL: {}", targetUrl);
         logger.debug("转发的请求数据: {}", requestBodyData);
-
+    
         return Flux.fromIterable(requestBodyData.getMessages())
             .flatMap(message -> {
                 try {
@@ -283,7 +288,7 @@ public class AsyncController {
                 .bodyToFlux(DataBuffer.class))
             .doFinally(signalType -> currentRequests.decrementAndGet());
     }
-
+    
     private String resolveTargetUrl(String urlOrParam) {
         return switch (urlOrParam.toLowerCase()) {
             case "claude" -> claudeUrl;
