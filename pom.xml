@@ -17,8 +17,8 @@
         <jackson.version>2.14.0</jackson.version>
         <lombok.version>1.18.24</lombok.version>
         <slf4j.version>2.0.0</slf4j.version>
-        <reactor.version>3.5.0</reactor.version> <!-- 升级 reactor 核心版本 -->
-        <reactor.netty.version>1.1.7</reactor.netty.version> <!-- 添加 reactor-netty 版本 -->
+        <reactor.version>3.5.0</reactor.version>
+        <reactor.netty.version>1.1.7</reactor.netty.version>
     </properties>
 
     <dependencies>
@@ -99,14 +99,6 @@
             <scope>runtime</scope>
             <optional>true</optional>
             <version>${spring.boot.version}</version>
-        </dependency>
-
-        <!-- Servlet API 依赖 -->
-        <dependency>
-            <groupId>javax.servlet</groupId>
-            <artifactId>javax.servlet-api</artifactId>
-            <version>4.0.1</version>
-            <scope>provided</scope>
         </dependency>
 
         <!-- 添加 javax.annotation-api 依赖 -->
