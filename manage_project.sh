@@ -266,7 +266,7 @@ function deploy_project() {
     setup_service
     start_or_restart_service
     echo -e "${GREEN}>>> 项目部署完成，重启脚本以生效最新配置...${NC}"
-    exec "$0"
+    exec bash "$0"
 }
 
 # 克隆或更新项目
