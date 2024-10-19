@@ -236,11 +236,13 @@ public class AsyncController {
         }
     }
 
-    @PostMapping("/**")
-    public Flux<DataBuffer> captureAndForward(@PathVariable String urlOrParam,
-                                              @RequestBody RequestBodyData requestBodyData,
-                                              @RequestHeader HttpHeaders headers,
-                                              @RequestHeader(value = "X-Forwarded-For", defaultValue = "localhost") String clientIp) {
+    @PostMapping("/forward")
+    public Flux<DataBuffer> captureAndForward(
+            @RequestParam("url") String urlOrParam,
+            @RequestBody RequestBodyData requestBodyData,
+            @RequestHeader HttpHeaders headers,
+            @RequestHeader(value = "X-Forwarded-For", defaultValue = "localhost") String clientIp) {
+
         logger.debug("接收到的请求URL: {}", urlOrParam); // 捕获URL
         if (requestBodyData.getMessages() == null || requestBodyData.getMessages().isEmpty()) {
             return Flux.error(new IllegalArgumentException("没有消息需要处理"));
