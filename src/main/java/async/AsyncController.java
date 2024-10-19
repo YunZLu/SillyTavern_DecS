@@ -303,6 +303,12 @@ public class AsyncController {
                 });
     }
     
+    private String resolveTargetUrl(String urlOrParam) {
+        // 如果 urlOrParam 是一个完整的 HTTP/HTTPS URL 直接返回
+        if (urlOrParam.startsWith("http://") || urlOrParam.startsWith("https://")) {
+            return urlOrParam;  // 直接返回目标地址
+        }
+    
         // 如果存在url前缀，移除它
         if (urlOrParam.startsWith("url:")) {
             urlOrParam = urlOrParam.substring(4);  // 移除 'url:' 前缀
