@@ -30,7 +30,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 @RestController
-@Order(1)
 public class AsyncController {
 
     private static final Logger logger = LoggerFactory.getLogger(AsyncController.class);
