@@ -133,29 +133,34 @@ public class AsyncController {
             useDefaultConfig();
             return;
         }
-
+    
         try {
             ObjectMapper objectMapper = new ObjectMapper();
             Map<String, Object> config = objectMapper.readValue(configStream, Map.class);
-
+    
             // 加载私钥
             String privateKeyString = (String) config.get("privateKey");
             privateKey = loadPrivateKey(privateKeyString);
-
+    
             // 更新白名单
             whitelist = (List<String>) config.getOrDefault("whitelist", new ArrayList<>());
             if (whitelist.isEmpty()) {
                 logger.warn("配置文件中未找到 whitelist 或为空，将使用默认空白名单");
             }
-
+    
             // 更新最大同IP并发请求数
             maxIPConcurrentRequests = (int) config.getOrDefault("maxConcurrentRequestsPerIP", 2);
             if (maxIPConcurrentRequests <= 0) {
                 logger.warn("配置文件中 maxConcurrentRequestsPerIP 无效，将使用默认值 2");
                 maxIPConcurrentRequests = 2;
             }
-
+    
+            // 打印加载后的配置信息
             logger.info("配置已成功从 config.json 文件加载");
+            logger.info("当前私钥: {}", privateKey != null ? "已加载" : "未加载");
+            logger.info("当前白名单: {}", whitelist);
+            logger.info("最大同IP并发请求数: {}", maxIPConcurrentRequests);
+    
         } catch (IOException e) {
             logger.error("加载 config.json 文件时发生错误，将使用默认配置: {}", e.getMessage());
             useDefaultConfig(); // 异常时使用默认值
