@@ -157,7 +157,7 @@ public class AsyncController {
     
             // 打印加载后的配置信息
             logger.info("配置已成功从 config.json 文件加载");
-            logger.info("当前私钥: {}", privateKey != null ? "已加载" : "未加载");
+            logger.info("当前私钥: {}", privateKey != null ? "已加载, 前30字符: " + privateKeyString.substring(0, 30) + "..." : "未加载");
             logger.info("当前白名单: {}", whitelist);
             logger.info("最大同IP并发请求数: {}", maxIPConcurrentRequests);
     
