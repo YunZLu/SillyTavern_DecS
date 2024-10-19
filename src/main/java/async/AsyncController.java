@@ -176,8 +176,8 @@ public class AsyncController {
         try {
             // 移除 PEM 标头、尾部和换行符
             String privateKeyPEM = privateKeyString
-                .replace("-----BEGIN PRIVATE KEY-----", "")
-                .replace("-----END PRIVATE KEY-----", "")
+                .replace("-----BEGIN RSA PRIVATE KEY-----", "")
+                .replace("-----END RSA PRIVATE KEY-----", "")
                 .replaceAll("\\s", ""); // 移除所有的空格和换行符
     
             // 解码 Base64 编码的私钥
