@@ -242,10 +242,11 @@ public class AsyncController {
     public Flux<DataBuffer> captureAndForward(@RequestBody RequestBodyData requestBodyData,
                                               @RequestHeader HttpHeaders headers,
                                               @RequestHeader(value = "X-Forwarded-For", defaultValue = "localhost") String clientIp,
-                                              ServerHttpRequest request) { // 使用 ServerHttpRequest
-        String urlOrParam = request.getURI().getPath().substring(1); // 获取完整的请求URI
-        String targetUrl = resolveTargetUrl(urlOrParam); // 解析目标URL
-        
+                                              ServerHttpRequest request) {
+        // 解析原始的 URI，去掉前缀 "/"
+        String urlOrParam = request.getPath().pathWithinApplication().value().substring(1);
+        String targetUrl = resolveTargetUrl(urlOrParam);
+    
         if (requestBodyData.getMessages() == null || requestBodyData.getMessages().isEmpty()) {
             return Flux.error(new IllegalArgumentException("没有消息需要处理"));
         }
@@ -256,11 +257,7 @@ public class AsyncController {
             return Flux.error(new IllegalArgumentException("来自该IP的并发请求过多"));
         }
     
-        if (!whitelist.contains(targetUrl)) {
-            currentRequests.decrementAndGet();
-            return Flux.error(new IllegalArgumentException("URL不在白名单中"));
-        }
-    
+        // 转发到解析后的目标 URL
         HttpHeaders filteredHeaders = filterHeaders(headers);
         logger.info("转发到目标URL: {}", targetUrl);
         logger.debug("转发的请求数据: {}", requestBodyData);
@@ -279,7 +276,7 @@ public class AsyncController {
                 }
             })
             .thenMany(webClient.post()
-                .uri(URI.create(targetUrl))
+                .uri(URI.create(targetUrl))  // 使用目标 URL 发送请求
                 .headers(httpHeaders -> httpHeaders.addAll(filteredHeaders))
                 .bodyValue(requestBodyData)
                 .retrieve()
@@ -300,6 +297,7 @@ public class AsyncController {
             case "clewd" -> clewdUrl;
             default -> "https://" + urlOrParam; // 否则添加 https:// 前缀
         };
+        throw new IllegalArgumentException("Invalid target URL: " + urlOrParam);
     }
     private HttpHeaders filterHeaders(HttpHeaders headers) {
         HttpHeaders filteredHeaders = new HttpHeaders();
