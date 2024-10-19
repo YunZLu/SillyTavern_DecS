@@ -236,14 +236,12 @@ public class AsyncController {
         }
     }
 
-    @PostMapping("/{urlOrParam}")
+    @PostMapping("/{urlOrParam:.+}")
     public Flux<DataBuffer> captureAndForward(@PathVariable String urlOrParam,
                                               @RequestBody RequestBodyData requestBodyData,
                                               @RequestHeader HttpHeaders headers,
                                               @RequestHeader(value = "X-Forwarded-For", defaultValue = "localhost") String clientIp) {
-        // 新增的调试日志
         logger.debug("接收到的请求URL: {}", urlOrParam); // 捕获URL
-    
         if (requestBodyData.getMessages() == null || requestBodyData.getMessages().isEmpty()) {
             return Flux.error(new IllegalArgumentException("没有消息需要处理"));
         }
@@ -267,26 +265,26 @@ public class AsyncController {
         logger.debug("转发的请求数据: {}", requestBodyData);
     
         return Flux.fromIterable(requestBodyData.getMessages())
-            .flatMap(message -> {
-                try {
-                    // 仅在消息以 "ENC:" 开头时才尝试解密
-                    if (isEncrypted(message.getContent())) {
-                        String decryptedContent = decryptAndCache(message.getContent());
-                        message.setContent(decryptedContent);
+                .flatMap(message -> {
+                    try {
+                        // 仅在消息以 "ENC:" 开头时才尝试解密
+                        if (isEncrypted(message.getContent())) {
+                            String decryptedContent = decryptAndCache(message.getContent());
+                            message.setContent(decryptedContent);
+                        }
+                        return Mono.just(message);  // 返回已修改或未修改的消息
+                    } catch (Exception e) {
+                        logger.error("解密消息时发生错误: {}", e.getMessage());
+                        return Mono.error(e);
                     }
-                    return Mono.just(message);  // 返回已修改或未修改的消息
-                } catch (Exception e) {
-                    logger.error("解密消息时发生错误: {}", e.getMessage());
-                    return Mono.error(e);
-                }
-            })
-            .thenMany(webClient.post()
-                .uri(targetUrl)
-                .headers(httpHeaders -> httpHeaders.addAll(filteredHeaders))
-                .bodyValue(requestBodyData)  // 将更新后的 message 发送出去
-                .retrieve()
-                .bodyToFlux(DataBuffer.class))
-            .doFinally(signalType -> currentRequests.decrementAndGet());
+                })
+                .thenMany(webClient.post()
+                        .uri(targetUrl)
+                        .headers(httpHeaders -> httpHeaders.addAll(filteredHeaders))
+                        .bodyValue(requestBodyData)  // 将更新后的 message 发送出去
+                        .retrieve()
+                        .bodyToFlux(DataBuffer.class))
+                .doFinally(signalType -> currentRequests.decrementAndGet());
     }
     
     private String resolveTargetUrl(String urlOrParam) {
@@ -307,7 +305,6 @@ public class AsyncController {
             default -> urlOrParam.startsWith("http") ? urlOrParam : "https://" + urlOrParam;
         };
     }
-
 
     private HttpHeaders filterHeaders(HttpHeaders headers) {
         HttpHeaders filteredHeaders = new HttpHeaders();
