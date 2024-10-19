@@ -297,7 +297,6 @@ public class AsyncController {
             case "clewd" -> clewdUrl;
             default -> "https://" + urlOrParam; // 否则添加 https:// 前缀
         };
-        throw new IllegalArgumentException("Invalid target URL: " + urlOrParam);
     }
     private HttpHeaders filterHeaders(HttpHeaders headers) {
         HttpHeaders filteredHeaders = new HttpHeaders();
