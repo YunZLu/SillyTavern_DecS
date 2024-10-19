@@ -286,10 +286,12 @@ public class AsyncController {
     }
 
     private String resolveTargetUrl(String urlOrParam) {
+        // 如果urlOrParam以 http:// 或 https:// 开头，则直接使用该URL作为目标
         if (urlOrParam.startsWith("http://") || urlOrParam.startsWith("https://")) {
-            // 如果urlOrParam已经是完整的URL，直接返回
             return urlOrParam;
         }
+        
+        // 如果urlOrParam是指定的关键字，则返回对应的URL
         return switch (urlOrParam.toLowerCase()) {
             case "claude" -> claudeUrl;
             case "clewd" -> clewdUrl;
