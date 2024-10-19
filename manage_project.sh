@@ -131,12 +131,16 @@ function set_concurrent_requests() {
 function set_private_key() {
     local current_private_key
     current_private_key=$(jq -r '.privateKey' "$CONFIG_PATH")
-    
+
     echo -e "${YELLOW}当前私钥: ${current_private_key:0:30}...(已隐藏)${NC}"
     echo -e "${YELLOW}请输入新的私钥内容（多行输入，按 Ctrl+D 完成输入）:${NC}"
-    private_key=$(</dev/stdin)  # 捕获多行输入的私钥
-    private_key=$(echo "$private_key" | tr -d '\n' | sed 's/ //g')  # 删除换行符和空格
-    jq '.privateKey = "'"$private_key"'"' "$CONFIG_PATH" > tmp.$$.json && mv tmp.$$.json "$CONFIG_PATH"
+
+    # 捕获多行输入的私钥，保留换行符
+    private_key=$(</dev/stdin)
+    
+    # 用 jq 更新 privateKey，而不删除换行符和空格
+    jq --arg privateKey "$private_key" '.privateKey = $privateKey' "$CONFIG_PATH" > tmp.$$.json && mv tmp.$$.json "$CONFIG_PATH"
+    
     echo -e "${GREEN}私钥已更新！${NC}"
 }
 
