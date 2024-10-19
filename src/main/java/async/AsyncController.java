@@ -243,6 +243,10 @@ public class AsyncController {
             @RequestHeader HttpHeaders headers,
             @RequestHeader(value = "X-Forwarded-For", defaultValue = "localhost") String clientIp) {
         logger.debug("接收到的请求URL: {}", urlOrParam); // 捕获URL
+        logger.debug("接收到的请求 URL: {}", urlOrParam);
+        logger.debug("接收到的请求体: {}", requestBodyData);
+        logger.debug("接收到的请求头: {}", headers);
+        logger.debug("客户端 IP: {}", clientIp);
         if (requestBodyData.getMessages() == null || requestBodyData.getMessages().isEmpty()) {
             return Flux.error(new IllegalArgumentException("没有消息需要处理"));
         }
