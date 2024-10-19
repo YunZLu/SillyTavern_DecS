@@ -155,7 +155,7 @@ function whitelist_menu() {
     echo -e "${BLUE}║${NC} （3）删除白名单${BLUE}                                  ║${NC}"
     echo -e "${BLUE}║${NC} （4）修改白名单${BLUE}                                  ║${NC}"
     echo -e "${BLUE}╠══════════════════════════════════════════════════╣${NC}"
-    echo -e "${BLUE}║${NC} （0）返回主菜单${BLUE}                                  ║${NC}"
+    echo -e "${BLUE}║${RED} （0）返回主菜单${BLUE}                                  ║${NC}"
     echo -e "${BLUE}╚══════════════════════════════════════════════════╝${NC}"
     read -rp "$(echo -e "${BLUE}请输入你的选择 [0-4]: ${NC}")" whitelist_choice
 
