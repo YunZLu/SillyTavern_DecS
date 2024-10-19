@@ -387,12 +387,18 @@ function show_menu() {
             retry_function update_script
             ;;
         7)
-            retry_function update_project
-            retry_function build_project
-            find_latest_jar
-            retry_function move_config_and_set_env
-            setup_service
-            start_or_restart_service
+            if is_deployed; then
+                echo -e "${YELLOW}>>> 服务已部署，开始更新...${NC}"
+                retry_function update_project
+                retry_function build_project
+                find_latest_jar
+                retry_function move_config_and_set_env
+                setup_service
+                start_or_restart_service
+            else
+                echo -e "${YELLOW}>>> 服务尚未部署，开始部署...${NC}"
+                deploy_project
+            fi
             ;;
         8)
             uninstall_service
