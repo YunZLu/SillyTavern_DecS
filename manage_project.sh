@@ -276,7 +276,7 @@ function update_project() {
         git pull
     else
         echo -e "${YELLOW}>>> 克隆GitHub项目...${NC}"
-        git clone "$GITHUB_REPO_URL" "/root/$PROJECT_NAME"
+        git clone "$GITHUB_REPO_URL"
         cd "/root/$PROJECT_NAME" || exit
     fi
 }
@@ -322,6 +322,7 @@ function uninstall_service() {
     source /etc/environment
 
     echo -e "${GREEN}>>> 服务及相关文件已完全卸载。${NC}"
+    cd /root
 }
 
 # 更新脚本
