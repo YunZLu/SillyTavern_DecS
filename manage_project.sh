@@ -392,7 +392,6 @@ function show_menu() {
                 retry_function update_project
                 retry_function build_project
                 find_latest_jar
-                retry_function move_config_and_set_env
                 setup_service
                 start_or_restart_service
             else
