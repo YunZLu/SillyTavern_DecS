@@ -237,40 +237,41 @@ public class AsyncController {
         }
     }
 
-    @PostMapping("/{urlOrParam:.+}") // 添加正则，确保可以处理带有"."的URL
-    public Flux<DataBuffer> captureAndForward(@PathVariable String urlOrParam,
-                                              @RequestBody RequestBodyData requestBodyData,
+    @PostMapping("/**")
+    public Flux<DataBuffer> captureAndForward(@RequestBody RequestBodyData requestBodyData,
                                               @RequestHeader HttpHeaders headers,
-                                              @RequestHeader(value = "X-Forwarded-For", defaultValue = "localhost") String clientIp) {
+                                              @RequestHeader(value = "X-Forwarded-For", defaultValue = "localhost") String clientIp,
+                                              HttpServletRequest request) {
+        String urlOrParam = request.getRequestURI().substring(1); // 获取完整的请求URI
+        String targetUrl = resolveTargetUrl(urlOrParam); // 解析目标URL
+        
         if (requestBodyData.getMessages() == null || requestBodyData.getMessages().isEmpty()) {
             return Flux.error(new IllegalArgumentException("没有消息需要处理"));
         }
-
+    
         AtomicInteger currentRequests = ipRequestCount.computeIfAbsent(clientIp, k -> new AtomicInteger(0));
         if (currentRequests.incrementAndGet() > maxIPConcurrentRequests) {
-            currentRequests.decrementAndGet(); // 减少并发数
+            currentRequests.decrementAndGet();
             return Flux.error(new IllegalArgumentException("来自该IP的并发请求过多"));
         }
-
-        String targetUrl = resolveTargetUrl(urlOrParam);
+    
         if (!whitelist.contains(targetUrl)) {
             currentRequests.decrementAndGet();
             return Flux.error(new IllegalArgumentException("URL不在白名单中"));
         }
-
+    
         HttpHeaders filteredHeaders = filterHeaders(headers);
         logger.info("转发到目标URL: {}", targetUrl);
         logger.debug("转发的请求数据: {}", requestBodyData);
-
+    
         return Flux.fromIterable(requestBodyData.getMessages())
             .flatMap(message -> {
                 try {
-                    // 仅在消息以 "ENC:" 开头时才尝试解密
                     if (isEncrypted(message.getContent())) {
                         String decryptedContent = decryptAndCache(message.getContent());
                         message.setContent(decryptedContent);
                     }
-                    return Mono.just(message);  // 返回已修改或未修改的消息
+                    return Mono.just(message);
                 } catch (Exception e) {
                     logger.error("解密消息时发生错误: {}", e.getMessage());
                     return Mono.error(e);
@@ -279,11 +280,12 @@ public class AsyncController {
             .thenMany(webClient.post()
                 .uri(URI.create(targetUrl))
                 .headers(httpHeaders -> httpHeaders.addAll(filteredHeaders))
-                .bodyValue(requestBodyData)  // 将更新后的 message 发送出去
+                .bodyValue(requestBodyData)
                 .retrieve()
                 .bodyToFlux(DataBuffer.class))
             .doFinally(signalType -> currentRequests.decrementAndGet());
     }
+
 
     private String resolveTargetUrl(String urlOrParam) {
         // 直接处理包含完整URL的情况，确保URL以 "http://" 或 "https://" 开头时直接返回
