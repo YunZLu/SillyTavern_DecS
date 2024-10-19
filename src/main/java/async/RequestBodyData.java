@@ -6,12 +6,12 @@ import java.util.Map;
 public class RequestBodyData {
     private List<Message> messages;
     private String model;  // 可选字段
-    private Double temperature;  // 可选字段
+    private Number temperature;  // 支持整数或浮点数
     private Integer max_tokens;  // 字段名与 JSON 保持一致
-    private Boolean stream;  // 可选字段
-    private Double presence_penalty;  // 字段名与 JSON 保持一致
-    private Double frequency_penalty;  // 字段名与 JSON 保持一致
-    private Double top_p;  // 字段名与 JSON 保持一致
+    private Boolean stream;  // 布尔值，JSON 应该是 true/false
+    private Number presence_penalty;  // 支持整数或浮点数
+    private Number frequency_penalty;  // 支持整数或浮点数
+    private Number top_p;  // 支持整数或浮点数
     private Map<String, Integer> logit_bias;  // 字段名与 JSON 保持一致
 
     // Getter 和 Setter 方法
@@ -31,11 +31,11 @@ public class RequestBodyData {
         this.model = model;
     }
 
-    public Double getTemperature() {
+    public Number getTemperature() {
         return temperature;
     }
 
-    public void setTemperature(Double temperature) {
+    public void setTemperature(Number temperature) {
         this.temperature = temperature;
     }
 
@@ -55,27 +55,27 @@ public class RequestBodyData {
         this.stream = stream;
     }
 
-    public Double getPresence_penalty() {
+    public Number getPresence_penalty() {
         return presence_penalty;
     }
 
-    public void setPresence_penalty(Double presence_penalty) {
+    public void setPresence_penalty(Number presence_penalty) {
         this.presence_penalty = presence_penalty;
     }
 
-    public Double getFrequency_penalty() {
+    public Number getFrequency_penalty() {
         return frequency_penalty;
     }
 
-    public void setFrequency_penalty(Double frequency_penalty) {
+    public void setFrequency_penalty(Number frequency_penalty) {
         this.frequency_penalty = frequency_penalty;
     }
 
-    public Double getTop_p() {
+    public Number getTop_p() {
         return top_p;
     }
 
-    public void setTop_p(Double top_p) {
+    public void setTop_p(Number top_p) {
         this.top_p = top_p;
     }
 
@@ -87,7 +87,6 @@ public class RequestBodyData {
         this.logit_bias = logit_bias;
     }
 
-    // 增加 toString() 方法，便于日志输出
     @Override
     public String toString() {
         return "RequestBodyData{" +
