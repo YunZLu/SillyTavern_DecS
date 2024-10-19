@@ -236,7 +236,7 @@ public class AsyncController {
         }
     }
 
-    @PostMapping("/api/{urlOrParam}")
+    @PostMapping("/{urlOrParam}")
     public Flux<DataBuffer> captureAndForward(@PathVariable String urlOrParam,
                                               @RequestBody RequestBodyData requestBodyData,
                                               @RequestHeader HttpHeaders headers,
