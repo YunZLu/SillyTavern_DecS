@@ -28,9 +28,9 @@ fi
 
 # 显示标题
 function show_header() {
-    echo -e "${BLUE}╔═══════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║          ${GREEN}欢迎使用酒馆解密服务脚本${NC}${BLUE}                     ║${NC}"
-    echo -e "${BLUE}╚═══════════════════════════════════════════════════════╝${NC}"
+    echo -e "${BLUE}╔══════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║          ${GREEN}欢迎使用酒馆解密服务脚本${NC}${BLUE}                ║${NC}"
+    echo -e "${BLUE}╚══════════════════════════════════════════════════╝${NC}"
 }
 
 # 通用重试函数，支持自定义最大重试次数和延迟
@@ -147,7 +147,7 @@ function set_private_key() {
 # 白名单设置页面
 function whitelist_menu() {
     echo -e "${BLUE}╔══════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║               ${GREEN}设置白名单${NC}${BLUE}                        ║${NC}"
+    echo -e "${BLUE}║                   ${GREEN}设置白名单${NC}${BLUE}                     ║${NC}"
     echo -e "${BLUE}╠══════════════════════════════════════════════════╣${NC}"
     echo -e "${BLUE}║${NC} （1）查看白名单${BLUE}                                  ║${NC}"
     echo -e "${BLUE}║${NC} （2）增加白名单${BLUE}                                  ║${NC}"
@@ -344,18 +344,18 @@ function update_script() {
 # 显示菜单并获取用户选择
 function show_menu() {
     echo -e "${BLUE}╔══════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║               ${GREEN}请选择一个操作${NC}${BLUE}                    ║${NC}"
+    echo -e "${BLUE}║                 ${GREEN}主菜单${NC}${BLUE}                      ║${NC}"
     echo -e "${BLUE}╠══════════════════════════════════════════════════╣${NC}"
-    echo -e "${BLUE}║${NC} （1）启动/重启服务${BLUE}                             ║${NC}"
-    echo -e "${BLUE}║${NC} （2）查看服务日志${BLUE}                             ║${NC}"
-    echo -e "${BLUE}║${NC} （3）设置白名单${BLUE}                              ║${NC}"
-    echo -e "${BLUE}║${NC} （4）设置同IP并发限制${BLUE}                         ║${NC}"
-    echo -e "${BLUE}║${NC} （5）设置私钥${BLUE}                                ║${NC}"
-    echo -e "${BLUE}║${NC} （6）更新项目管理脚本${BLUE}                          ║${NC}"
-    echo -e "${BLUE}║${NC} （7）安装/更新服务${BLUE}                                 ║${NC}"
-    echo -e "${BLUE}║${NC} （8）完全卸载服务${BLUE}                             ║${NC}"
+    echo -e "${BLUE}║${NC} （1）启动/重启服务        ${BLUE}                    ║${NC}"
+    echo -e "${BLUE}║${NC} （2）查看服务日志        ${BLUE}                    ║${NC}"
+    echo -e "${BLUE}║${NC} （3）设置白名单          ${BLUE}                    ║${NC}"
+    echo -e "${BLUE}║${NC} （4）设置同IP并发限制     ${BLUE}                    ║${NC}"
+    echo -e "${BLUE}║${NC} （5）设置私钥            ${BLUE}                    ║${NC}"
+    echo -e "${BLUE}║${NC} （6）更新项目管理脚本      ${BLUE}                    ║${NC}"
+    echo -e "${BLUE}║${NC} （7）安装/更新服务        ${BLUE}                    ║${NC}"
+    echo -e "${BLUE}║${NC} （8）完全卸载服务         ${BLUE}                    ║${NC}"
     echo -e "${BLUE}╠══════════════════════════════════════════════════╣${NC}"
-    echo -e "${BLUE}║${RED} （0）退出${NC}${BLUE}                                      ║${NC}"
+    echo -e "${BLUE}║${RED} （0）退出                ${BLUE}                    ║${NC}"
     echo -e "${BLUE}╚══════════════════════════════════════════════════╝${NC}"
     read -rp "$(echo -e "${BLUE}输入你的选择 [0-8]: ${NC}")" choice
 
