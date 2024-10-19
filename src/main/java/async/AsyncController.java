@@ -28,8 +28,6 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import org.springframework.http.server.reactive.ServerHttpRequest;
-import javax.servlet.http.HttpServletRequest;
 
 @RestController
 public class AsyncController {
@@ -239,30 +237,18 @@ public class AsyncController {
     }
 
     @PostMapping("/**")
-    public Flux<DataBuffer> captureAndForward(HttpServletRequest request,
+    public Flux<DataBuffer> captureAndForward(@PathVariable String urlOrParam,
                                               @RequestBody RequestBodyData requestBodyData,
                                               @RequestHeader HttpHeaders headers,
                                               @RequestHeader(value = "X-Forwarded-For", defaultValue = "localhost") String clientIp) {
-        logger.info("captureAndForward 方法被调用");
-    
-        // 提取路径并移除前导斜杠
-        String path = request.getRequestURI();
-        if (path.startsWith("/")) {
-            path = path.substring(1);
-        }
-        String urlOrParam = path;
-    
         logger.debug("接收到的请求URL: {}", urlOrParam); // 捕获URL
-    
         if (requestBodyData.getMessages() == null || requestBodyData.getMessages().isEmpty()) {
-            logger.warn("没有消息需要处理");
             return Flux.error(new IllegalArgumentException("没有消息需要处理"));
         }
     
         AtomicInteger currentRequests = ipRequestCount.computeIfAbsent(clientIp, k -> new AtomicInteger(0));
         if (currentRequests.incrementAndGet() > maxIPConcurrentRequests) {
             currentRequests.decrementAndGet(); // 减少并发数
-            logger.warn("来自IP {} 的并发请求过多", clientIp);
             return Flux.error(new IllegalArgumentException("来自该IP的并发请求过多"));
         }
     
@@ -271,7 +257,6 @@ public class AsyncController {
     
         if (!whitelist.contains(targetUrl)) {
             currentRequests.decrementAndGet();
-            logger.warn("URL {} 不在白名单中", targetUrl);
             return Flux.error(new IllegalArgumentException("URL不在白名单中"));
         }
     
@@ -282,6 +267,7 @@ public class AsyncController {
         return Flux.fromIterable(requestBodyData.getMessages())
                 .flatMap(message -> {
                     try {
+                        // 仅在消息以 "ENC:" 开头时才尝试解密
                         if (isEncrypted(message.getContent())) {
                             String decryptedContent = decryptAndCache(message.getContent());
                             message.setContent(decryptedContent);
@@ -295,12 +281,12 @@ public class AsyncController {
                 .thenMany(webClient.post()
                         .uri(targetUrl)
                         .headers(httpHeaders -> httpHeaders.addAll(filteredHeaders))
-                        .bodyValue(requestBodyData)
+                        .bodyValue(requestBodyData)  // 将更新后的 message 发送出去
                         .retrieve()
                         .bodyToFlux(DataBuffer.class))
                 .doFinally(signalType -> currentRequests.decrementAndGet());
     }
-
+    
     private String resolveTargetUrl(String urlOrParam) {
         // 如果 urlOrParam 是一个完整的 HTTP/HTTPS URL 直接返回
         if (urlOrParam.startsWith("http://") || urlOrParam.startsWith("https://")) {
