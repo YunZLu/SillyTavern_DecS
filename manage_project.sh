@@ -146,6 +146,7 @@ function set_private_key() {
 
 # 白名单设置页面
 function whitelist_menu() {
+    echo -e "\n"
     echo -e "${BLUE}╔══════════════════════════════════════════════════╗${NC}"
     echo -e "${BLUE}║                   ${GREEN}设置白名单${NC}${BLUE}                     ║${NC}"
     echo -e "${BLUE}╠══════════════════════════════════════════════════╣${NC}"
