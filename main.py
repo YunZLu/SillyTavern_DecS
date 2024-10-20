@@ -148,10 +148,17 @@ def filter_headers(headers):
 @app.route("/<path:target>", methods=["POST"])
 async def capture_and_forward(target):
     try:
+        # 获取客户端请求的 JSON 数据
         data = await request.get_json()
         messages = data.get("messages")
         client_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
         target_url = resolve_target_url(target)
+
+        # 日志记录请求信息
+        logging.info(f"客户端 IP: {client_ip}")
+        logging.info(f"转发请求目标 URL: {target_url}")
+        logging.info(f"请求头: {dict(request.headers)}")
+        logging.info(f"请求体: {data}")
 
         if not messages:
             return jsonify({"error": "没有消息需要处理"}), 400
@@ -176,18 +183,23 @@ async def capture_and_forward(target):
                 message["content"] = decrypted_contents[i]
 
             # 异步发送请求到目标服务器并处理响应
-            async with httpx.AsyncClient() as client:
+            async with httpx.AsyncClient(timeout=60.0) as client:  # 设置超时为60秒
+                logging.info(f"发送到目标服务器的消息: {messages}")
                 async with client.stream("POST", target_url, json={"messages": messages}) as response:
+                    if response.status_code != 200:
+                        logging.error(f"目标服务器返回错误状态码: {response.status_code}")
+                        return jsonify({"error": "目标服务器错误"}), response.status_code
+
                     async def generate():
                         async for chunk in response.aiter_bytes(chunk_size=4096):
                             yield chunk
 
-                    # 直接返回生成器，不需要 stream_with_context
                     return Response(generate(), content_type="application/octet-stream")
 
     except Exception as e:
         logging.error(f"处理请求时发生错误: {e}")
         return jsonify({"error": "内部错误"}), 500
+
 
 # 主函数，设置 Watchdog 监控配置文件并启动 Quart
 if __name__ == "__main__":
