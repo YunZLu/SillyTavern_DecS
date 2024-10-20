@@ -4,7 +4,7 @@ import logging
 import base64
 import hashlib
 import asyncio
-from quart import Quart, request, jsonify, Response, stream_with_context
+from quart import Quart, request, jsonify, Response
 import httpx
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
@@ -13,7 +13,6 @@ from collections import defaultdict
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
 
 # 初始化日志配置
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
@@ -39,7 +38,7 @@ class ConfigFileHandler(FileSystemEventHandler):
     def on_modified(self, event):
         if event.src_path.endswith(CONFIG_PATH):
             logging.info(f"检测到 {CONFIG_PATH} 文件更新，重新加载配置")
-            asyncio.run(load_config())
+            asyncio.create_task(load_config())  # 改为异步创建任务而非同步运行
 
 # 加载私钥
 def load_private_key(private_key_string):
@@ -77,7 +76,10 @@ async def load_config():
         for semaphore in ip_semaphores.values():
             semaphore._value = max_ip_concurrent_requests  # 更新并发请求限制
 
-        logging.info(f"配置加载完成：白名单: {whitelist}, 最大同IP并发请求数: {max_ip_concurrent_requests}")
+        logging.info("配置加载完成:")
+        logging.info(f"私钥状态: {'已加载' if private_key else '未加载'}")
+        logging.info(f"白名单: {whitelist}")
+        logging.info(f"最大同IP并发请求数: {max_ip_concurrent_requests}")
 
     except Exception as e:
         logging.error(f"加载配置文件时发生错误: {e}")
@@ -89,7 +91,10 @@ def use_default_config():
     private_key = None
     whitelist = []
     max_ip_concurrent_requests = 2
-    logging.info("使用默认配置：白名单为空，私钥为空，最大同IP并发请求数为2")
+    logging.info("使用默认配置：")
+    logging.info("私钥状态: 未加载")
+    logging.info("白名单: []")
+    logging.info("最大同IP并发请求数: 2")
 
 # 生成加密哈希
 def generate_hash(message):
