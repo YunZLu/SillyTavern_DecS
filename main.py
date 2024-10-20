@@ -159,11 +159,11 @@ async def capture_and_forward(target):
         client_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
         target_url = resolve_target_url(target)
 
-        # 日志记录请求信息
+        # 记录收到的客户端请求信息
+        logging.info(f"收到的客户端请求信息：")
         logging.info(f"客户端 IP: {client_ip}")
-        logging.info(f"转发请求目标 URL: {target_url}")
-        logging.info(f"请求头: {dict(request.headers)}")
-        logging.info(f"请求体: {data}")
+        logging.info(f"客户端请求头: {dict(request.headers)}")
+        logging.info(f"客户端请求体: {data}")
 
         if not messages:
             return jsonify({"error": "没有消息需要处理"}), 400
@@ -195,10 +195,14 @@ async def capture_and_forward(target):
                 'Content-Type': 'application/json'
             }
 
+            # 记录转发到目标服务器的请求信息
+            logging.info(f"转发的请求信息：")
+            logging.info(f"转发目标 URL: {target_url}")
+            logging.info(f"转发请求头: {headers}")
+            logging.info(f"转发请求体: {messages}")
+
             # 异步发送请求到目标服务器并处理响应
             async with httpx.AsyncClient(timeout=60.0) as client:  # 设置超时为60秒
-                logging.info(f"发送到目标服务器的消息: {messages}")
-
                 async with client.stream("POST", target_url, json={"messages": messages}, headers=headers) as response:
                     if response.status_code != 200:
                         error_details = await response.aread()  # 读取错误详情
