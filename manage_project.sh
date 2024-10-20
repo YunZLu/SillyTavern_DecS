@@ -77,7 +77,7 @@ function setup_python_env() {
 }
 
 # 启动 Flask 服务
-cd $PROJECT_NAME
+cd /root/$PROJECT_NAME
 function start_flask_service() {
     echo -e "${YELLOW}>>> 启动 Flask 服务...${NC}"
 
