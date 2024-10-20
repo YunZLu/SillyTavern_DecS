@@ -203,29 +203,20 @@ async def capture_and_forward(target):
             logging.info(f"转发请求头: {headers}")
             logging.info(f"转发请求体: {data}")
 
-            # 使用流式处理
-            async with httpx.AsyncClient(timeout=60.0, http2=True) as client:
-                try:
-                    async with client.stream("POST", target_url, json=data, headers=headers) as response:
-                        if response.status_code != 200:
-                            error_details = await response.aread()  # 读取错误详情
-                            logging.error(f"目标服务器返回错误状态码: {response.status_code}, 错误信息: {error_details}")
-                            return jsonify({"error": "目标服务器错误"}), response.status_code
+            # 异步发送完整的请求体到目标服务器，流式传输响应
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                async with client.stream("POST", target_url, json=data, headers=headers) as response:
+                    if response.status_code != 200:
+                        error_details = await response.aread()  # 读取错误详情
+                        logging.error(f"目标服务器返回错误状态码: {response.status_code}, 错误信息: {error_details}")
+                        return jsonify({"error": "目标服务器错误"}), response.status_code
 
-                        # 返回流式响应
-                        async def generate():
-                            try:
-                                async for chunk in response.aiter_bytes(chunk_size=4096):
-                                    yield chunk
-                            except httpx.StreamClosed:
-                                logging.warning("Stream closed prematurely, returning partial response.")
-                                return
+                    # 流式传输响应给客户端
+                    async def generate():
+                        async for chunk in response.aiter_bytes(chunk_size=4096):
+                            yield chunk
 
-                        return Response(generate(), content_type="application/octet-stream")
-
-                except httpx.StreamClosed as e:
-                    logging.error(f"StreamClosed error occurred: {e}")
-                    return jsonify({"error": "Stream closed unexpectedly"}), 500
+                    return Response(generate(), content_type=response.headers.get('Content-Type', 'application/octet-stream'))
 
     except Exception as e:
         logging.error(f"处理请求时发生错误: {e}")
