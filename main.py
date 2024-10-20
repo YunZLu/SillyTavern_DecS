@@ -181,11 +181,15 @@ async def capture_and_forward(target):
 
         # 获取当前IP的信号量，控制并发请求数（初始化信号量时确保信号量存在）
         semaphore = ip_semaphores[client_ip]
-        logging.info(f"IP {client_ip} 的信号量当前值: {semaphore._value}")
+        
+        # 记录尝试获取信号量前的日志
+        logging.info(f"IP {client_ip} 的信号量尝试获取，当前值: {semaphore._value}")
 
         # 尝试立即获取信号量，如果获取失败，返回错误
         try:
             await asyncio.wait_for(semaphore.acquire(), timeout=0)  # 使用 wait_for 来设置超时
+            # 记录获取信号量后的日志
+            logging.info(f"IP {client_ip} 获取信号量成功，剩余值: {semaphore._value}")
         except asyncio.TimeoutError:
             logging.error(f"IP {client_ip} 的并发请求超出限制")
             return jsonify({"error": "并发请求数超出限制，请稍后重试"}), 429
@@ -239,7 +243,7 @@ async def capture_and_forward(target):
 
         finally:
             semaphore.release()  # 确保处理完请求后释放信号量
-            logging.info(f"IP {client_ip} 的信号量已释放")
+            logging.info(f"IP {client_ip} 的信号量已释放，当前值: {semaphore._value}")
 
     except Exception as e:
         logging.error(f"处理请求时发生错误: {e}")
