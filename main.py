@@ -206,26 +206,20 @@ async def capture_and_forward(target):
             # 异步发送完整的请求体到目标服务器，自动处理 Content-Length
             async with httpx.AsyncClient(timeout=60.0) as client:
                 try:
-                    response = await client.post(target_url, json=data, headers=headers)  # 从目标服务器获取完整响应
+                    response = await client.post(target_url, json=data, headers=headers)  # 改用post而不是stream
                     response.raise_for_status()  # 确保抛出异常时处理错误
                 except httpx.HTTPStatusError as exc:
                     error_details = exc.response.text
                     logging.error(f"目标服务器返回错误状态码: {exc.response.status_code}, 错误信息: {error_details}")
                     return jsonify({"error": "目标服务器错误"}), exc.response.status_code
 
-            # 将数据分块流式传输给客户端
-            def generate_chunks(data, chunk_size=2):
-                for i in range(0, len(data), chunk_size):
-                    yield data[i:i + chunk_size]
-
-            return Response(
-                generate_chunks(response.content),  # 使用生成器逐块发送数据
-                content_type="application/octet-stream"
-            )
+                # 返回目标服务器的完整响应
+                return Response(response.content, content_type="application/json")
 
     except Exception as e:
         logging.error(f"处理请求时发生错误: {e}")
         return jsonify({"error": "内部错误"}), 500
+
 
 # 主函数，设置 Watchdog 监控配置文件并启动 Quart
 if __name__ == "__main__":
