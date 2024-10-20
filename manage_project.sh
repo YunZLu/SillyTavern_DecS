@@ -4,8 +4,8 @@
 GITHUB_REPO_URL="https://github.com/YunZLu/SillyTavern_DecS.git"
 PROJECT_NAME="SillyTavern_DecS"
 APP_NAME="sillytavern-decs-app"
-CONFIG_PATH="$PROJECT_NAME/config.json"
-VENV_PATH="$PROJECT_NAME/venv"
+CONFIG_PATH="./config.json"
+VENV_PATH="./venv"
 DEFAULT_PORT=5050
 
 GREEN='\033[0;32m'
@@ -70,7 +70,7 @@ function setup_python_env() {
     # 激活虚拟环境并安装依赖
     source "$VENV_PATH/bin/activate"
     pip install --upgrade pip
-    pip install -r $PROJECT_NAME/requirements.txt
+    pip install -r ./requirements.txt
     deactivate
 }
 
