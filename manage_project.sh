@@ -264,6 +264,7 @@ function show_menu() {
     case $choice in
         1)
             start_flask_service
+            cd /root
             ;;
         2)
             whitelist_menu
