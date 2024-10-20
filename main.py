@@ -14,6 +14,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
+import aiofiles  # 新增
 
 # 初始化日志配置
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
@@ -36,13 +37,14 @@ executor = ThreadPoolExecutor(max_workers=os.cpu_count() * 2)
 
 # 监控配置文件的 Handler
 class ConfigFileHandler(FileSystemEventHandler):
+    def __init__(self, loop):
+        self.loop = loop  # 保存 asyncio 循环
+    
     def on_modified(self, event):
         if event.src_path.endswith(CONFIG_PATH):
             logging.info(f"检测到 {CONFIG_PATH} 文件更新，重新加载配置")
-            # 通过事件循环调度异步任务
-            loop = asyncio.get_running_loop()
-            asyncio.run_coroutine_threadsafe(load_config(), loop)
-
+            # 使用 asyncio 的事件循环调度异步任务
+            asyncio.run_coroutine_threadsafe(load_config(), self.loop)
 
 # 加载私钥
 def load_private_key(private_key_string):
@@ -63,8 +65,9 @@ async def load_config():
         return
 
     try:
-        with open(CONFIG_PATH, 'r') as config_file:
-            config = json.load(config_file)
+        async with aiofiles.open(CONFIG_PATH, 'r') as config_file:  # 使用 aiofiles 进行异步读取
+            config_data = await config_file.read()
+            config = json.loads(config_data)
 
         private_key_string = config.get("privateKey", "")
         if private_key_string:
@@ -207,7 +210,7 @@ async def capture_and_forward(target):
             # 异步发送完整的请求体到目标服务器
             async with httpx.AsyncClient(timeout=60.0) as client:
                 try:
-                    response = await client.post(target_url, json=data, headers=headers)  # 改用post而不是stream
+                    response = await client.post(target_url, json=data, headers=headers)
                     response.raise_for_status()  # 确保抛出异常时处理错误
                 except httpx.HTTPStatusError as exc:
                     error_details = exc.response.text
@@ -223,24 +226,22 @@ async def capture_and_forward(target):
 
     except Exception as e:
         logging.error(f"处理请求时发生错误: {e}")
-        return jsonify({"error": "内部错误"}), 500
-
-
-# 在 Quart 应用启动前加载配置
-@app.before_serving
-async def startup_load_config():
-    await load_config()
+        return jsonify({"error": "内部服务器错误"}), 500
 
 # 主函数，设置 Watchdog 监控配置文件并启动 Quart
 if __name__ == "__main__":
+    # 获取 asyncio 的事件循环
+    loop = asyncio.get_event_loop()
+
     # 启动 Watchdog 监控配置文件变化
     observer = Observer()
-    event_handler = ConfigFileHandler()
+    event_handler = ConfigFileHandler(loop)
     observer.schedule(event_handler, path=".", recursive=False)  # 监控项目目录
     observer.start()
 
+    # 启动 Quart 应用
     try:
-        app.run(host="0.0.0.0", port=5050)
+        app.run(host="0.0.0.0", port=5050, use_reloader=False)  # 禁用 Quart 自带的文件监控
     finally:
         observer.stop()
         observer.join()
