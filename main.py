@@ -25,7 +25,7 @@ app = Quart(__name__)
 private_key = None
 whitelist = []
 max_ip_concurrent_requests = 2
-ip_semaphores = defaultdict(lambda: asyncio.Semaphore(max_ip_concurrent_requests))
+ip_semaphores = defaultdict(lambda: asyncio.BoundedSemaphore(max_ip_concurrent_requests))
 cache = {}
 
 # 配置文件路径
@@ -179,30 +179,24 @@ async def capture_and_forward(target):
         if 'messages' not in data:
             return jsonify({"error": "没有消息需要处理"}), 400
 
-        # 获取当前IP的信号量，控制并发请求数（初始化信号量时确保信号量存在）
+        # 获取当前IP的信号量，控制并发请求数
         semaphore = ip_semaphores[client_ip]
-        
-        # 检查信号量是否被锁定
-        logging.info(f"IP {client_ip} 的信号量尝试获取，当前值: {semaphore._value}, 信号量是否被锁定: {semaphore.locked()}")
 
-        # 尝试直接获取信号量
-        if not semaphore.acquire(blocking=False):  # 尝试非阻塞获取信号量
+        # 获取信号量控制并发请求，最多等待1秒
+        try:
+            await asyncio.wait_for(semaphore.acquire(), timeout=1)
+        except asyncio.TimeoutError:
             logging.error(f"IP {client_ip} 的并发请求超出限制")
             return jsonify({"error": "并发请求数超出限制，请稍后重试"}), 429
 
         try:
-            # 执行请求处理逻辑
-            logging.info(f"IP {client_ip} 正在处理请求")
-
             # 异步解密消息，保持顺序
             tasks = [
                 decrypt_message_async(msg["content"]) if is_encrypted(msg["content"]) else msg["content"]
                 for msg in data["messages"]
             ]
 
-            decrypted_contents = await asyncio.gather(
-                *(task if asyncio.iscoroutine(task) else asyncio.to_thread(lambda x: x, task) for task in tasks)
-            )
+            decrypted_contents = await asyncio.gather(*tasks)
 
             # 替换消息内容为解密后的内容
             for i, message in enumerate(data["messages"]):
@@ -224,7 +218,7 @@ async def capture_and_forward(target):
             logging.info(f"转发请求头: {headers}")
             logging.info(f"转发请求体: {data}")
 
-            # 异步发送完整的请求体到目标服务器，自动处理 Content-Length
+            # 异步发送完整的请求体到目标服务器
             async with httpx.AsyncClient(timeout=60.0) as client:
                 try:
                     response = await client.post(target_url, json=data, headers=headers)  # 改用post而不是stream
@@ -239,7 +233,7 @@ async def capture_and_forward(target):
 
         finally:
             semaphore.release()  # 确保处理完请求后释放信号量
-            logging.info(f"IP {client_ip} 的信号量已释放，当前值: {semaphore._value}")
+            logging.info(f"IP {client_ip} 的信号量已释放")
 
     except Exception as e:
         logging.error(f"处理请求时发生错误: {e}")
