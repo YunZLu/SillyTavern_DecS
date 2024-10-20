@@ -77,6 +77,7 @@ function setup_python_env() {
 }
 
 # 启动 Flask 服务
+cd $PROJECT_NAME
 function start_flask_service() {
     echo -e "${YELLOW}>>> 启动 Flask 服务...${NC}"
 
@@ -85,8 +86,7 @@ function start_flask_service() {
         return 1
     fi
 
-    # 启动 Flask 服务
-    cd $PROJECT_NAME
+
     source "$VENV_PATH/bin/activate"
     echo -e "${GREEN}>>> Flask 服务启动中，按 Ctrl+C 退出...${NC}"
     gunicorn --workers 4 --bind 0.0.0.0:$DEFAULT_PORT main:app
