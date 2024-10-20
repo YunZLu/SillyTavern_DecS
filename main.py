@@ -13,6 +13,7 @@ from collections import defaultdict
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime
 
 # 初始化日志配置
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
@@ -73,8 +74,9 @@ async def load_config():
         max_ip_concurrent_requests = config.get("maxConcurrentRequestsPerIP", 2)
 
         # 动态更新每个IP的信号量
-        for semaphore in ip_semaphores.values():
+        for ip, semaphore in ip_semaphores.items():
             semaphore._value = max_ip_concurrent_requests  # 更新并发请求限制
+            logging.info(f"IP: {ip}, 信号量设置为: {max_ip_concurrent_requests}")
 
         logging.info("配置加载完成:")
         logging.info(f"私钥状态: {'已加载' if private_key else '未加载'}")
@@ -155,7 +157,6 @@ def filter_headers(headers):
     }
 
 # 流式接收目标服务器的响应并逐步返回给客户端
-# 流式接收目标服务器的响应并逐步返回给客户端
 @app.route("/<path:target>", methods=["POST"])
 async def capture_and_forward(target):
     try:
@@ -171,7 +172,7 @@ async def capture_and_forward(target):
 
         # 记录收到的客户端请求信息
         logging.info(f"收到的客户端请求信息：")
-        logging.info(f"客户端 IP: {client_ip}")
+        logging.info(f"客户端 IP: {client_ip}, 时间: {datetime.now()}")
         logging.info(f"客户端请求头: {dict(request.headers)}")
         logging.info(f"客户端请求体: {data}")
 
@@ -180,6 +181,7 @@ async def capture_and_forward(target):
 
         # 获取当前IP的信号量，控制并发请求数（初始化信号量时确保信号量存在）
         semaphore = ip_semaphores[client_ip]
+        logging.info(f"IP {client_ip} 的信号量当前值: {semaphore._value}")
 
         # 尝试立即获取信号量，如果获取失败，返回错误
         try:
@@ -237,11 +239,11 @@ async def capture_and_forward(target):
 
         finally:
             semaphore.release()  # 确保处理完请求后释放信号量
+            logging.info(f"IP {client_ip} 的信号量已释放")
 
     except Exception as e:
         logging.error(f"处理请求时发生错误: {e}")
         return jsonify({"error": "内部错误"}), 500
-
 
 # 在 Quart 应用启动前加载配置
 @app.before_serving
