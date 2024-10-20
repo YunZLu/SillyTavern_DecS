@@ -28,7 +28,7 @@ ip_semaphores = defaultdict(lambda: asyncio.Semaphore(max_ip_concurrent_requests
 cache = {}
 
 # 配置文件路径
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
+CONFIG_PATH = "config.json"
 
 # 动态创建线程池，用于异步解密操作，线程数基于 CPU 核心数量
 executor = ThreadPoolExecutor(max_workers=os.cpu_count() * 2)
@@ -38,7 +38,7 @@ class ConfigFileHandler(FileSystemEventHandler):
     def on_modified(self, event):
         if event.src_path.endswith(CONFIG_PATH):
             logging.info(f"检测到 {CONFIG_PATH} 文件更新，重新加载配置")
-            asyncio.create_task(load_config())  # 改为异步创建任务而非同步运行
+            asyncio.create_task(load_config())  # 异步加载配置
 
 # 加载私钥
 def load_private_key(private_key_string):
@@ -241,11 +241,13 @@ async def capture_and_forward(target):
         return jsonify({"error": "内部错误"}), 500
 
 
+# 在 Quart 应用启动前加载配置
+@app.before_serving
+async def startup_load_config():
+    await load_config()
+
 # 主函数，设置 Watchdog 监控配置文件并启动 Quart
 if __name__ == "__main__":
-    # 异步加载配置
-    asyncio.run(load_config())
-
     # 启动 Watchdog 监控配置文件变化
     observer = Observer()
     event_handler = ConfigFileHandler()
