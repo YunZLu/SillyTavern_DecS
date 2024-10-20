@@ -208,21 +208,14 @@ async def capture_and_forward(target):
             logging.info(f"转发请求体: {data}")
 
             # 异步发送完整的请求体到目标服务器
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                try:
-                    response = await client.post(target_url, json=data, headers=headers)
-                    response.raise_for_status()  # 确保抛出异常时处理错误
-                except httpx.HTTPStatusError as exc:
-                    error_details = exc.response.text
-                    logging.error(f"目标服务器返回错误状态码: {exc.response.status_code}, 错误信息: {error_details}")
-                    return jsonify({"error": "目标服务器错误"}), exc.response.status_code
+            async with httpx.AsyncClient(timeout=300) as client:
+                response = await client.post(target_url, json=data, headers=headers)
 
-                # 返回目标服务器的完整响应
-                return Response(response.content, content_type="application/json")
+            # 将目标服务器的响应返回给客户端
+            return Response(response.content, status=response.status_code, headers=dict(response.headers))
 
         finally:
-            semaphore.release()  # 确保处理完请求后释放信号量
-            logging.info(f"IP {client_ip} 的信号量已释放")
+            semaphore.release()
 
     except Exception as e:
         logging.error(f"处理请求时发生错误: {e}")
@@ -238,6 +231,9 @@ if __name__ == "__main__":
     event_handler = ConfigFileHandler(loop)
     observer.schedule(event_handler, path=".", recursive=False)  # 监控项目目录
     observer.start()
+
+    # **主动加载配置文件**
+    loop.run_until_complete(load_config())
 
     # 启动 Quart 应用
     try:
