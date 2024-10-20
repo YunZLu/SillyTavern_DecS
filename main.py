@@ -39,7 +39,10 @@ class ConfigFileHandler(FileSystemEventHandler):
     def on_modified(self, event):
         if event.src_path.endswith(CONFIG_PATH):
             logging.info(f"检测到 {CONFIG_PATH} 文件更新，重新加载配置")
-            asyncio.create_task(load_config())  # 异步加载配置
+            # 通过事件循环调度异步任务
+            loop = asyncio.get_running_loop()
+            asyncio.run_coroutine_threadsafe(load_config(), loop)
+
 
 # 加载私钥
 def load_private_key(private_key_string):
