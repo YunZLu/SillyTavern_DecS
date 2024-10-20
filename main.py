@@ -155,6 +155,7 @@ def filter_headers(headers):
     }
 
 # 流式接收目标服务器的响应并逐步返回给客户端
+# 流式接收目标服务器的响应并逐步返回给客户端
 @app.route("/<path:target>", methods=["POST"])
 async def capture_and_forward(target):
     try:
@@ -181,8 +182,9 @@ async def capture_and_forward(target):
         semaphore = ip_semaphores[client_ip]
 
         # 尝试立即获取信号量，如果获取失败，返回错误
-        acquired = await semaphore.acquire(timeout=0)  # 尝试立即获取信号量
-        if not acquired:
+        try:
+            await asyncio.wait_for(semaphore.acquire(), timeout=0)  # 使用 wait_for 来设置超时
+        except asyncio.TimeoutError:
             logging.error(f"IP {client_ip} 的并发请求超出限制")
             return jsonify({"error": "并发请求数超出限制，请稍后重试"}), 429
 
