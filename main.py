@@ -192,7 +192,7 @@ async def capture_and_forward(target):
 
                 async with client.stream("POST", target_url, json={"messages": messages}, headers=headers) as response:
                     if response.status_code != 200:
-                        error_details = await response.json()  # 获取错误信息
+                        error_details = await response.aread()  # 使用 aread 读取流式响应
                         logging.error(f"目标服务器返回错误状态码: {response.status_code}, 错误信息: {error_details}")
                         return jsonify({"error": "目标服务器错误"}), response.status_code
 
