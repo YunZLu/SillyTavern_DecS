@@ -153,7 +153,7 @@ def filter_headers(headers):
 @app.route("/<path:target>", methods=["POST"])
 async def capture_and_forward(target):
     try:
-        # 获取客户端请求的 JSON 数据
+        # 获取客户端请求的 JSON 数据（包括 messages 和其他参数）
         data = await request.get_json()
         client_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
         target_url = resolve_target_url(target)
@@ -183,10 +183,11 @@ async def capture_and_forward(target):
                 *(task if asyncio.iscoroutine(task) else asyncio.to_thread(lambda x: x, task) for task in tasks)
             )
 
+            # 替换消息内容为解密后的内容
             for i, message in enumerate(data["messages"]):
                 message["content"] = decrypted_contents[i]
 
-            # 设置请求头，只保留需要的部分
+            # 设置请求头，只保留需要的部分，移除 'Content-Length'
             headers = {
                 'Content-Type': 'application/json',
                 'Authorization': request.headers.get('Authorization', ''),
@@ -203,7 +204,7 @@ async def capture_and_forward(target):
             logging.info(f"转发请求体: {data}")
 
             # 使用流式处理
-            async with httpx.AsyncClient(timeout=60.0) as client:
+            async with httpx.AsyncClient(timeout=60.0, http2=True) as client:
                 try:
                     async with client.stream("POST", target_url, json=data, headers=headers) as response:
                         if response.status_code != 200:
