@@ -1,0 +1,9 @@
+{
+  "privateKey": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASC...\n-----END PRIVATE KEY-----",
+  "whitelist": [
+    "https://example.com",
+    "https://api.example.org",
+    "https://another-trusted-site.com"
+  ],
+  "maxConcurrentRequestsPerIP": 5
+}
