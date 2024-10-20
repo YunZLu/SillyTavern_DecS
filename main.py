@@ -156,7 +156,7 @@ def filter_headers(headers):
         'Content-Type': 'application/json'
     }
 
-# 流式接收目标服务器的响应并逐步返回给客户端
+# 转发流程控制
 @app.route("/<path:target>", methods=["POST"])
 async def capture_and_forward(target):
     try:
@@ -192,7 +192,7 @@ async def capture_and_forward(target):
         try:
             # 异步解密消息，保持顺序
             tasks = [
-                decrypt_message_async(msg["content"]) if is_encrypted(msg["content"]) else msg["content"]
+                decrypt_message_async(msg["content"]) if is_encrypted(msg["content"]) else asyncio.to_thread(lambda x: x, msg["content"])
                 for msg in data["messages"]
             ]
 
