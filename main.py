@@ -185,9 +185,12 @@ async def capture_and_forward(target):
             # 异步发送请求到目标服务器并处理响应
             async with httpx.AsyncClient(timeout=60.0) as client:  # 设置超时为60秒
                 logging.info(f"发送到目标服务器的消息: {messages}")
-                async with client.stream("POST", target_url, json={"messages": messages}) as response:
+
+                # 不过滤请求头，直接使用原始请求头
+                async with client.stream("POST", target_url, json={"messages": messages}, headers=dict(request.headers)) as response:
                     if response.status_code != 200:
-                        logging.error(f"目标服务器返回错误状态码: {response.status_code}")
+                        error_details = await response.json()  # 获取错误信息
+                        logging.error(f"目标服务器返回错误状态码: {response.status_code}, 错误信息: {error_details}")
                         return jsonify({"error": "目标服务器错误"}), response.status_code
 
                     async def generate():
@@ -199,7 +202,6 @@ async def capture_and_forward(target):
     except Exception as e:
         logging.error(f"处理请求时发生错误: {e}")
         return jsonify({"error": "内部错误"}), 500
-
 
 # 主函数，设置 Watchdog 监控配置文件并启动 Quart
 if __name__ == "__main__":
