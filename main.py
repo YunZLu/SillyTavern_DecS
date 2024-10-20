@@ -187,16 +187,21 @@ async def capture_and_forward(target):
             for i, message in enumerate(messages):
                 message["content"] = decrypted_contents[i]
 
+            # 设置需要的请求头
+            headers = {
+                'Accept': 'application/json',
+                'Authorization': request.headers.get('Authorization', ''),
+                'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
+                'Content-Type': 'application/json'
+            }
+
             # 异步发送请求到目标服务器并处理响应
             async with httpx.AsyncClient(timeout=60.0) as client:  # 设置超时为60秒
                 logging.info(f"发送到目标服务器的消息: {messages}")
 
-                # 过滤请求头，保留必要的头部
-                headers = filter_headers(request.headers)
-
                 async with client.stream("POST", target_url, json={"messages": messages}, headers=headers) as response:
                     if response.status_code != 200:
-                        error_details = await response.aread()  # 使用 aread 读取流式响应
+                        error_details = await response.aread()  # 读取错误详情
                         logging.error(f"目标服务器返回错误状态码: {response.status_code}, 错误信息: {error_details}")
                         return jsonify({"error": "目标服务器错误"}), response.status_code
 
