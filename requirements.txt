@@ -1,6 +1,6 @@
-Quart==0.18.3
+Quart>=0.18.3
 httpx==0.24.0
 requests==2.31.0
 cryptography==41.0.3
 watchdog==3.0.0
-Werkzeug
+Werkzeug>=2.2.0
