@@ -141,8 +141,9 @@ def resolve_target_url(url_or_param):
 
 # 过滤请求头
 def filter_headers(headers):
+    # 保留 Authorization 和 User-Agent 头
     excluded_headers = ["Host", "Content-Length", "Accept-Encoding", "Connection"]
-    return {key: value for key, value in headers.items() if key not in excluded_headers}
+    return {key: value for key, value in headers.items() if key not in excluded_headers or key in ['Authorization', 'User-Agent']}
 
 # 流式接收目标服务器的响应并逐步返回给客户端
 @app.route("/<path:target>", methods=["POST"])
@@ -186,12 +187,10 @@ async def capture_and_forward(target):
             async with httpx.AsyncClient(timeout=60.0) as client:  # 设置超时为60秒
                 logging.info(f"发送到目标服务器的消息: {messages}")
 
-                # 确保请求体的格式正确
-                request_body = {
-                    "messages": messages
-                }
+                # 过滤请求头，保留必要的头部
+                headers = filter_headers(request.headers)
 
-                async with client.stream("POST", target_url, json=request_body, headers=dict(request.headers)) as response:
+                async with client.stream("POST", target_url, json={"messages": messages}, headers=headers) as response:
                     if response.status_code != 200:
                         error_details = await response.json()  # 获取错误信息
                         logging.error(f"目标服务器返回错误状态码: {response.status_code}, 错误信息: {error_details}")
