@@ -141,9 +141,13 @@ def resolve_target_url(url_or_param):
 
 # 过滤请求头
 def filter_headers(headers):
-    # 保留 Authorization 和 User-Agent 头
-    excluded_headers = ["Host", "Content-Length", "Accept-Encoding", "Connection"]
-    return {key: value for key, value in headers.items() if key not in excluded_headers or key in ['Authorization', 'User-Agent']}
+    # 只保留需要的头部信息
+    return {
+        'Accept': 'application/json',
+        'Authorization': headers.get('Authorization', ''),
+        'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
+        'Content-Type': 'application/json'
+    }
 
 # 流式接收目标服务器的响应并逐步返回给客户端
 @app.route("/<path:target>", methods=["POST"])
