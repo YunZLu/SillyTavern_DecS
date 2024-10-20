@@ -72,6 +72,7 @@ function setup_python_env() {
     pip install --upgrade pip
     pip install -r ./requirements.txt
     deactivate
+    cd /root
 }
 
 # 启动 Flask 服务
@@ -84,9 +85,10 @@ function start_flask_service() {
     fi
 
     # 启动 Flask 服务
+    cd $PROJECT_NAME
     source "$VENV_PATH/bin/activate"
     echo -e "${GREEN}>>> Flask 服务启动中，按 Ctrl+C 退出...${NC}"
-    gunicorn --workers 4 --bind 0.0.0.0:$DEFAULT_PORT $PROJECT_NAME.main:app
+    gunicorn --workers 4 --bind 0.0.0.0:$DEFAULT_PORT main:app
     deactivate
 }
 
