@@ -89,7 +89,7 @@ function start_flask_service() {
 
     source "$VENV_PATH/bin/activate"
     echo -e "${GREEN}>>> Flask 服务启动中，按 Ctrl+C 退出...${NC}"
-    gunicorn -w 4 -k uvicorn.workers.UvicornWorker main:app --bind 0.0.0.0:$DEFAULT_PORT
+    hypercorn main:app --bind 0.0.0.0:$DEFAULT_PORT
     deactivate
 }
 
