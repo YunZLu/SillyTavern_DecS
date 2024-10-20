@@ -153,9 +153,8 @@ def filter_headers(headers):
 @app.route("/<path:target>", methods=["POST"])
 async def capture_and_forward(target):
     try:
-        # 获取客户端请求的 JSON 数据
+        # 获取客户端请求的 JSON 数据（包括 messages 和其他参数）
         data = await request.get_json()
-        messages = data.get("messages")
         client_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
         target_url = resolve_target_url(target)
 
@@ -165,7 +164,7 @@ async def capture_and_forward(target):
         logging.info(f"客户端请求头: {dict(request.headers)}")
         logging.info(f"客户端请求体: {data}")
 
-        if not messages:
+        if 'messages' not in data:
             return jsonify({"error": "没有消息需要处理"}), 400
 
         # 获取当前IP的信号量，控制并发请求数
@@ -177,32 +176,36 @@ async def capture_and_forward(target):
             # 异步解密消息，保持顺序
             tasks = [
                 decrypt_message_async(msg["content"]) if is_encrypted(msg["content"]) else msg["content"]
-                for msg in messages
+                for msg in data["messages"]
             ]
 
             decrypted_contents = await asyncio.gather(
                 *(task if asyncio.iscoroutine(task) else asyncio.to_thread(lambda x: x, task) for task in tasks)
             )
 
-            for i, message in enumerate(messages):
+            # 替换消息内容为解密后的内容
+            for i, message in enumerate(data["messages"]):
                 message["content"] = decrypted_contents[i]
 
-            # 使用客户端发送的请求头进行转发
-            headers = dict(request.headers)
-
-            # 删除 Content-Length 和 Host 头部，让 httpx 自动处理
-            headers.pop('Content-Length', None)
-            headers.pop('Host', None)
+            # 设置请求头，只保留需要的部分，移除 'Content-Length'
+            headers = {
+                'Content-Type': 'application/json',
+                'Authorization': request.headers.get('Authorization', ''),
+                'Accept': '*/*',
+                'User-Agent': 'node-fetch/1.0 (+https://github.com/bitinn/node-fetch)',
+                'Accept-Encoding': 'gzip,deflate',
+                'Connection': 'close'
+            }
 
             # 记录转发到目标服务器的请求信息
             logging.info(f"转发的请求信息：")
             logging.info(f"转发目标 URL: {target_url}")
             logging.info(f"转发请求头: {headers}")
-            logging.info(f"转发请求体: {messages}")
+            logging.info(f"转发请求体: {data}")
 
-            # 异步发送请求到目标服务器并处理响应
+            # 异步发送完整的请求体到目标服务器，自动计算 Content-Length
             async with httpx.AsyncClient(timeout=60.0) as client:  # 设置超时为60秒
-                async with client.stream("POST", target_url, json={"messages": messages}, headers=headers) as response:
+                async with client.stream("POST", target_url, json=data, headers=headers) as response:
                     if response.status_code != 200:
                         error_details = await response.aread()  # 读取错误详情
                         logging.error(f"目标服务器返回错误状态码: {response.status_code}, 错误信息: {error_details}")
