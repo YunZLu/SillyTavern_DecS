@@ -214,7 +214,7 @@ async def capture_and_forward(target):
                     return jsonify({"error": "目标服务器错误"}), exc.response.status_code
 
             # 将数据分块流式传输给客户端
-            def generate_chunks(data, chunk_size=4096):
+            def generate_chunks(data, chunk_size=512):
                 for i in range(0, len(data), chunk_size):
                     yield data[i:i + chunk_size]
 
