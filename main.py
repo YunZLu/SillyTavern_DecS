@@ -186,8 +186,12 @@ async def capture_and_forward(target):
             async with httpx.AsyncClient(timeout=60.0) as client:  # 设置超时为60秒
                 logging.info(f"发送到目标服务器的消息: {messages}")
 
-                # 不过滤请求头，直接使用原始请求头
-                async with client.stream("POST", target_url, json={"messages": messages}, headers=dict(request.headers)) as response:
+                # 确保请求体的格式正确
+                request_body = {
+                    "messages": messages
+                }
+
+                async with client.stream("POST", target_url, json=request_body, headers=dict(request.headers)) as response:
                     if response.status_code != 200:
                         error_details = await response.json()  # 获取错误信息
                         logging.error(f"目标服务器返回错误状态码: {response.status_code}, 错误信息: {error_details}")
