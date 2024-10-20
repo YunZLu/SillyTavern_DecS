@@ -158,6 +158,11 @@ async def capture_and_forward(target):
         client_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
         target_url = resolve_target_url(target)
 
+        # 检查目标 URL 是否在白名单中
+        if not any(allowed_url in target_url for allowed_url in whitelist):
+            logging.error(f"目标 URL 不在白名单中: {target_url}")
+            return jsonify({"error": "目标服务器不在白名单中"}), 403
+
         # 记录收到的客户端请求信息
         logging.info(f"收到的客户端请求信息：")
         logging.info(f"客户端 IP: {client_ip}")
@@ -167,10 +172,17 @@ async def capture_and_forward(target):
         if 'messages' not in data:
             return jsonify({"error": "没有消息需要处理"}), 400
 
-        # 获取当前IP的信号量，控制并发请求数
+        # 获取当前IP的信号量，控制并发请求数（初始化信号量时确保信号量存在）
         semaphore = ip_semaphores[client_ip]
 
-        async with semaphore:
+        # 尝试立即获取信号量，如果获取失败，返回错误
+        acquired = await semaphore.acquire(timeout=0)  # 尝试立即获取信号量
+        if not acquired:
+            logging.error(f"IP {client_ip} 的并发请求超出限制")
+            return jsonify({"error": "并发请求数超出限制，请稍后重试"}), 429
+
+        try:
+            # 执行请求处理逻辑
             logging.info(f"IP {client_ip} 正在处理请求")
 
             # 异步解密消息，保持顺序
@@ -215,6 +227,9 @@ async def capture_and_forward(target):
 
                 # 返回目标服务器的完整响应
                 return Response(response.content, content_type="application/json")
+
+        finally:
+            semaphore.release()  # 确保处理完请求后释放信号量
 
     except Exception as e:
         logging.error(f"处理请求时发生错误: {e}")
