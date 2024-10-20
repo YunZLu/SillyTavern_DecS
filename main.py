@@ -133,10 +133,11 @@ def resolve_target_url(url_or_param):
     if url_or_param.startswith("url:"):
         url_or_param = url_or_param[4:]
 
+    # 替换为你的具体URL
     if url_or_param.lower() == "claude":
-        return claude_url
+        return "https://example-claude-url.com"
     elif url_or_param.lower() == "clewd":
-        return clewd_url
+        return "https://example-clewd-url.com"
     return "https://" + url_or_param
 
 # 过滤请求头
@@ -163,8 +164,15 @@ async def capture_and_forward(target):
             logging.info(f"IP {client_ip} 正在处理请求")
 
             # 异步解密消息，保持顺序
-            tasks = [decrypt_message_async(msg["content"]) if is_encrypted(msg["content"]) else msg["content"] for msg in messages]
-            decrypted_contents = await asyncio.gather(*tasks)
+            tasks = [
+                decrypt_message_async(msg["content"]) if is_encrypted(msg["content"]) else msg["content"] 
+                for msg in messages
+            ]
+
+            # 执行解密操作，确保所有任务都为 awaitable
+            decrypted_contents = await asyncio.gather(
+                *(task if asyncio.iscoroutine(task) else asyncio.sleep(0, result=task) for task in tasks)
+            )
 
             for i, message in enumerate(messages):
                 message["content"] = decrypted_contents[i]
