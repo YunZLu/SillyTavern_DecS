@@ -193,7 +193,7 @@ async def capture_and_forward(target):
                 message["content"] = decrypted_contents[i]
 
             # 设置请求头，只移除 'Content-Length'
-            headers = {k: v for k, v in request.headers.items() if k != 'Content-Length'}
+            headers = {k: v for k, v in request.headers.items() if k not in ['Content-Length', 'Host']}
 
             # 记录转发到目标服务器的请求信息
             logging.info(f"转发的请求信息：")
