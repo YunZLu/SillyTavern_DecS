@@ -203,20 +203,25 @@ async def capture_and_forward(target):
             logging.info(f"转发请求头: {headers}")
             logging.info(f"转发请求体: {data}")
 
-            # 异步发送完整的请求体到目标服务器，流式传输响应
+            # 异步发送完整的请求体到目标服务器，自动处理 Content-Length
             async with httpx.AsyncClient(timeout=60.0) as client:
-                async with client.stream("POST", target_url, json=data, headers=headers) as response:
-                    if response.status_code != 200:
-                        error_details = await response.aread()  # 读取错误详情
-                        logging.error(f"目标服务器返回错误状态码: {response.status_code}, 错误信息: {error_details}")
-                        return jsonify({"error": "目标服务器错误"}), response.status_code
+                try:
+                    response = await client.post(target_url, json=data, headers=headers)  # 从目标服务器获取完整响应
+                    response.raise_for_status()  # 确保抛出异常时处理错误
+                except httpx.HTTPStatusError as exc:
+                    error_details = exc.response.text
+                    logging.error(f"目标服务器返回错误状态码: {exc.response.status_code}, 错误信息: {error_details}")
+                    return jsonify({"error": "目标服务器错误"}), exc.response.status_code
 
-                    # 流式传输响应给客户端
-                    async def generate():
-                        async for chunk in response.aiter_bytes(chunk_size=4096):
-                            yield chunk
+            # 将数据分块流式传输给客户端
+            def generate_chunks(data, chunk_size=4096):
+                for i in range(0, len(data), chunk_size):
+                    yield data[i:i + chunk_size]
 
-                    return Response(generate(), content_type=response.headers.get('Content-Type', 'application/octet-stream'))
+            return Response(
+                generate_chunks(response.content),  # 使用生成器逐块发送数据
+                content_type="application/octet-stream"
+            )
 
     except Exception as e:
         logging.error(f"处理请求时发生错误: {e}")
