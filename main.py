@@ -4,8 +4,8 @@ import logging
 import base64
 import hashlib
 import asyncio
-from flask import Flask, request, jsonify, Response, stream_with_context
-from requests import request as req
+from quart import Quart, request, jsonify, Response, stream_with_context
+import httpx
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
@@ -18,14 +18,13 @@ from datetime import datetime
 # 初始化日志配置
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
 
-# 初始化 Flask 应用
-app = Flask(__name__)
+# 初始化 Quart 应用
+app = Quart(__name__)
 
 # 全局配置变量
 private_key = None
 whitelist = []
 max_ip_concurrent_requests = 2
-ip_request_count = defaultdict(int)
 ip_semaphores = defaultdict(lambda: asyncio.Semaphore(max_ip_concurrent_requests))
 cache = {}
 
@@ -40,7 +39,7 @@ class ConfigFileHandler(FileSystemEventHandler):
     def on_modified(self, event):
         if event.src_path.endswith(CONFIG_PATH):
             logging.info(f"检测到 {CONFIG_PATH} 文件更新，重新加载配置")
-            load_config()
+            asyncio.run(load_config())
 
 # 加载私钥
 def load_private_key(private_key_string):
@@ -52,7 +51,7 @@ def load_private_key(private_key_string):
         return None
 
 # 重新加载配置文件
-def load_config():
+async def load_config():
     global private_key, whitelist, max_ip_concurrent_requests
 
     if not os.path.exists(CONFIG_PATH):
@@ -149,7 +148,7 @@ def filter_headers(headers):
 @app.route("/<path:target>", methods=["POST"])
 async def capture_and_forward(target):
     try:
-        data = request.get_json()
+        data = await request.get_json()
         messages = data.get("messages")
         client_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
         target_url = resolve_target_url(target)
@@ -165,37 +164,34 @@ async def capture_and_forward(target):
 
             # 异步解密消息，保持顺序
             tasks = [
-                decrypt_message_async(msg["content"]) if is_encrypted(msg["content"]) else msg["content"] 
+                decrypt_message_async(msg["content"]) if is_encrypted(msg["content"]) else msg["content"]
                 for msg in messages
             ]
 
-            # 执行解密操作，确保所有任务都为 awaitable
             decrypted_contents = await asyncio.gather(
-                *(task if asyncio.iscoroutine(task) else asyncio.sleep(0, result=task) for task in tasks)
+                *(task if asyncio.iscoroutine(task) else asyncio.to_thread(lambda x: x, task) for task in tasks)
             )
 
             for i, message in enumerate(messages):
                 message["content"] = decrypted_contents[i]
 
-            # 发送请求并使用流模式接收响应
-            def generate():
-                with req("POST", target_url, json={"messages": messages}, headers=filter_headers(request.headers), stream=True) as response:
-                    for chunk in response.iter_content(chunk_size=4096):
-                        if chunk:
+            # 异步发送请求到目标服务器并处理响应
+            async with httpx.AsyncClient() as client:
+                async with client.stream("POST", target_url, json={"messages": messages}) as response:
+                    async def generate():
+                        async for chunk in response.aiter_bytes(chunk_size=4096):
                             yield chunk
 
-            # 返回流式响应到客户端
-            return Response(stream_with_context(generate()), content_type="application/octet-stream")
+                    return Response(stream_with_context(generate()), content_type="application/octet-stream")
 
     except Exception as e:
         logging.error(f"处理请求时发生错误: {e}")
         return jsonify({"error": "内部错误"}), 500
-    finally:
-        ip_request_count[client_ip] -= 1
 
-# 主函数，设置 Watchdog 监控配置文件并启动 Flask
+# 主函数，设置 Watchdog 监控配置文件并启动 Quart
 if __name__ == "__main__":
-    load_config()
+    # 异步加载配置
+    asyncio.run(load_config())
 
     # 启动 Watchdog 监控配置文件变化
     observer = Observer()
