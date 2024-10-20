@@ -1,9 +1,0 @@
-{
-  "whitelist": [
-    "https://example1.com",
-    "https://example2.com",
-    "https://example3.com"
-  ],
-  "maxConcurrentRequestsPerIP": 5,
-  "privateKey": "MIIEvQIBADANBgkq..."
-}
