@@ -200,6 +200,7 @@ async def capture_and_forward(target):
                         async for chunk in response.aiter_bytes(chunk_size=4096):
                             yield chunk
 
+                    # 返回流式响应
                     return Response(generate(), content_type="application/octet-stream")
 
     except Exception as e:
