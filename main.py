@@ -146,16 +146,6 @@ def resolve_target_url(url_or_param):
         return "https://example-clewd-url.com"
     return "https://" + url_or_param
 
-# 过滤请求头
-def filter_headers(headers):
-    # 只保留需要的头部信息
-    return {
-        'Accept': 'application/json',
-        'Authorization': headers.get('Authorization', ''),
-        'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
-        'Content-Type': 'application/json'
-    }
-
 # 转发流程控制
 @app.route("/<path:target>", methods=["POST"])
 async def capture_and_forward(target):
@@ -202,15 +192,8 @@ async def capture_and_forward(target):
             for i, message in enumerate(data["messages"]):
                 message["content"] = decrypted_contents[i]
 
-            # 设置请求头，只保留需要的部分，移除 'Content-Length'
-            headers = {
-                'Content-Type': 'application/json',
-                'Authorization': request.headers.get('Authorization', ''),
-                'Accept': '*/*',
-                'User-Agent': 'node-fetch/1.0 (+https://github.com/bitinn/node-fetch)',
-                'Accept-Encoding': 'gzip,deflate',
-                'Connection': 'close'
-            }
+            # 设置请求头，只移除 'Content-Length'
+            headers = {k: v for k, v in request.headers.items() if k != 'Content-Length'}
 
             # 记录转发到目标服务器的请求信息
             logging.info(f"转发的请求信息：")
