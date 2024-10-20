@@ -218,10 +218,9 @@ async def capture_and_forward(target):
                     return jsonify({"error": "目标服务器错误"}), exc.response.status_code
 
                 # 返回目标服务器的完整响应
-                return Response(response.content, content_type="application/json")
-
+                return Response(response.content, status=response.status_code, headers=dict(response.headers))
         finally:
-            semaphore.release()  # 确保处理完请求后释放信号量
+            semaphore.release()
             logging.info(f"IP {client_ip} 的信号量已释放")
 
     except Exception as e:
