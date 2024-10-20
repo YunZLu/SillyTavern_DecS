@@ -187,13 +187,8 @@ async def capture_and_forward(target):
             for i, message in enumerate(messages):
                 message["content"] = decrypted_contents[i]
 
-            # 设置需要的请求头
-            headers = {
-                'Accept': 'application/json',
-                'Authorization': request.headers.get('Authorization', ''),
-                'User-Agent': 'Apifox/1.0.0 (https://apifox.com)',
-                'Content-Type': 'application/json'
-            }
+            # 使用客户端发送的请求头进行转发
+            headers = dict(request.headers)
 
             # 记录转发到目标服务器的请求信息
             logging.info(f"转发的请求信息：")
