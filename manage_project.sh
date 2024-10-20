@@ -2,6 +2,7 @@
 
 # 更新后的 GitHub 仓库地址和项目名
 GITHUB_REPO_URL="https://github.com/YunZLu/SillyTavern_DecS.git"
+SCRIPT_URL="https://raw.githubusercontent.com/YunZLu/SillyTavern_DecS/refs/heads/main/manage_project.sh"
 PROJECT_NAME="SillyTavern_DecS"
 APP_NAME="sillytavern-decs-app"
 CONFIG_PATH="./config.json"
