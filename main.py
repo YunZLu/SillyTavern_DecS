@@ -28,7 +28,7 @@ ip_semaphores = defaultdict(lambda: asyncio.Semaphore(max_ip_concurrent_requests
 cache = {}
 
 # 配置文件路径
-CONFIG_PATH = "config.json"
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "config.json")
 
 # 动态创建线程池，用于异步解密操作，线程数基于 CPU 核心数量
 executor = ThreadPoolExecutor(max_workers=os.cpu_count() * 2)
