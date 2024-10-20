@@ -190,6 +190,9 @@ async def capture_and_forward(target):
             # 使用客户端发送的请求头进行转发
             headers = dict(request.headers)
 
+            # 删除 Content-Length 头部，让 httpx 自动处理
+            headers.pop('Content-Length', None)
+
             # 记录转发到目标服务器的请求信息
             logging.info(f"转发的请求信息：")
             logging.info(f"转发目标 URL: {target_url}")
@@ -214,6 +217,7 @@ async def capture_and_forward(target):
     except Exception as e:
         logging.error(f"处理请求时发生错误: {e}")
         return jsonify({"error": "内部错误"}), 500
+
 
 # 主函数，设置 Watchdog 监控配置文件并启动 Quart
 if __name__ == "__main__":
