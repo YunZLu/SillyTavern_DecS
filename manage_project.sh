@@ -4,8 +4,8 @@
 GITHUB_REPO_URL="https://github.com/YunZLu/SillyTavern_DecS.git"
 PROJECT_NAME="SillyTavern_DecS"
 APP_NAME="sillytavern-decs-app"
-CONFIG_PATH="./config.json"
-VENV_PATH="./venv"
+CONFIG_PATH="$PROJECT_NAME/config.json"
+VENV_PATH="$PROJECT_NAME/venv"
 DEFAULT_PORT=5050
 
 GREEN='\033[0;32m'
@@ -70,7 +70,7 @@ function setup_python_env() {
     # 激活虚拟环境并安装依赖
     source "$VENV_PATH/bin/activate"
     pip install --upgrade pip
-    pip install -r requirements.txt
+    pip install -r $PROJECT_NAME/requirements.txt
     deactivate
 }
 
@@ -86,7 +86,7 @@ function start_flask_service() {
     # 启动 Flask 服务
     source "$VENV_PATH/bin/activate"
     echo -e "${GREEN}>>> Flask 服务启动中，按 Ctrl+C 退出...${NC}"
-    gunicorn --workers 4 --bind 0.0.0.0:$DEFAULT_PORT main:app
+    gunicorn --workers 4 --bind 0.0.0.0:$DEFAULT_PORT $PROJECT_NAME.main:app
     deactivate
 }
 
@@ -207,12 +207,17 @@ function update_script() {
     fi
 }
 
-# 更新项目
+# 克隆或更新项目
 function update_project() {
-    echo -e "${YELLOW}>>> 拉取最新代码...${NC}"
-    cd "$PROJECT_NAME" || exit
-    git pull
-    setup_python_env
+    if [ -d "$PROJECT_NAME" ]; then
+        echo -e "${YELLOW}>>> 项目文件夹已存在，拉取最新代码...${NC}"
+        cd "$PROJECT_NAME" || exit
+        git pull
+    else
+        echo -e "${YELLOW}>>> 克隆 GitHub 项目...${NC}"
+        git clone "$GITHUB_REPO_URL"
+        cd "$PROJECT_NAME" || exit
+    fi
 }
 
 # 完全卸载服务
@@ -294,6 +299,7 @@ if is_deployed; then
 else
     echo -e "${YELLOW}>>> 项目尚未部署，开始部署流程...${NC}"
     retry_function install_and_check_dependencies
+    retry_function update_project
     retry_function setup_python_env
     while true; do
         show_menu
