@@ -14,7 +14,7 @@ from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-import aiofiles  # 新增
+import aiofiles  # 异步文件处理库
 
 # 初始化日志配置
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
@@ -210,7 +210,7 @@ async def capture_and_forward(target):
             # 异步发送完整的请求体到目标服务器
             async with httpx.AsyncClient(timeout=60.0) as client:
                 try:
-                    response = await client.post(target_url, json=data, headers=headers)  # 改用post而不是stream
+                    response = await client.post(target_url, json=data, headers=headers)
                     response.raise_for_status()  # 确保抛出异常时处理错误
                 except httpx.HTTPStatusError as exc:
                     error_details = exc.response.text
@@ -228,7 +228,6 @@ async def capture_and_forward(target):
         logging.error(f"处理请求时发生错误: {e}")
         return jsonify({"error": "内部错误"}), 500
 
-
 # 在 Quart 应用启动前加载配置
 @app.before_serving
 async def startup_load_config():
@@ -244,9 +243,6 @@ if __name__ == "__main__":
     event_handler = ConfigFileHandler(loop)
     observer.schedule(event_handler, path=".", recursive=False)  # 监控项目目录
     observer.start()
-
-    # **主动加载配置文件**
-    loop.run_until_complete(load_config())
 
     # 启动 Quart 应用
     try:
