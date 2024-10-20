@@ -202,17 +202,29 @@ async def capture_and_forward(target):
             logging.info(f"转发请求头: {headers}")
             logging.info(f"转发请求体: {data}")
 
-            # 异步发送完整的请求体到目标服务器
+            # 使用流式处理
             async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(target_url, json=data, headers=headers)
+                try:
+                    async with client.stream("POST", target_url, json=data, headers=headers) as response:
+                        if response.status_code != 200:
+                            error_details = await response.aread()  # 读取错误详情
+                            logging.error(f"目标服务器返回错误状态码: {response.status_code}, 错误信息: {error_details}")
+                            return jsonify({"error": "目标服务器错误"}), response.status_code
 
-                if response.status_code != 200:
-                    error_details = response.text
-                    logging.error(f"目标服务器返回错误状态码: {response.status_code}, 错误信息: {error_details}")
-                    return jsonify({"error": "目标服务器错误"}), response.status_code
+                        # 返回流式响应
+                        async def generate():
+                            try:
+                                async for chunk in response.aiter_bytes(chunk_size=4096):
+                                    yield chunk
+                            except httpx.StreamClosed:
+                                logging.warning("Stream closed prematurely, returning partial response.")
+                                return
 
-                # 返回目标服务器的完整响应
-                return Response(response.content, content_type="application/json")
+                        return Response(generate(), content_type="application/octet-stream")
+
+                except httpx.StreamClosed as e:
+                    logging.error(f"StreamClosed error occurred: {e}")
+                    return jsonify({"error": "Stream closed unexpectedly"}), 500
 
     except Exception as e:
         logging.error(f"处理请求时发生错误: {e}")
