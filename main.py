@@ -208,18 +208,31 @@ async def capture_and_forward(target):
             logging.info(f"转发请求体: {data}")
 
             # 异步发送完整的请求体到目标服务器
-            async with httpx.AsyncClient(timeout=300) as client:
-                response = await client.post(target_url, json=data, headers=headers)
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                try:
+                    response = await client.post(target_url, json=data, headers=headers)  # 改用post而不是stream
+                    response.raise_for_status()  # 确保抛出异常时处理错误
+                except httpx.HTTPStatusError as exc:
+                    error_details = exc.response.text
+                    logging.error(f"目标服务器返回错误状态码: {exc.response.status_code}, 错误信息: {error_details}")
+                    return jsonify({"error": "目标服务器错误"}), exc.response.status_code
 
-            # 将目标服务器的响应返回给客户端
-            return Response(response.content, status=response.status_code, headers=dict(response.headers))
+                # 返回目标服务器的完整响应
+                return Response(response.content, content_type="application/json")
 
         finally:
-            semaphore.release()
+            semaphore.release()  # 确保处理完请求后释放信号量
+            logging.info(f"IP {client_ip} 的信号量已释放")
 
     except Exception as e:
         logging.error(f"处理请求时发生错误: {e}")
-        return jsonify({"error": "内部服务器错误"}), 500
+        return jsonify({"error": "内部错误"}), 500
+
+
+# 在 Quart 应用启动前加载配置
+@app.before_serving
+async def startup_load_config():
+    await load_config()
 
 # 主函数，设置 Watchdog 监控配置文件并启动 Quart
 if __name__ == "__main__":
