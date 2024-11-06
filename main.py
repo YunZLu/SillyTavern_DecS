@@ -38,12 +38,12 @@ executor = ThreadPoolExecutor(max_workers=os.cpu_count() * 2)
 # 监控配置文件的 Handler
 class ConfigFileHandler(FileSystemEventHandler):
     def __init__(self, loop):
-        self.loop = loop  # 保存 asyncio 循环
+        self.loop = loop  # 保存 Quart 应用的事件循环
     
     def on_modified(self, event):
         if event.src_path.endswith(CONFIG_PATH):
             logging.info(f"检测到 {CONFIG_PATH} 文件更新，重新加载配置")
-            # 使用 asyncio 的事件循环调度异步任务
+            # 使用 Quart 应用的事件循环调度异步任务
             asyncio.run_coroutine_threadsafe(load_config(), self.loop)
 
 # 加载私钥
@@ -234,12 +234,12 @@ async def startup_load_config():
 
 # 主函数，设置 Watchdog 监控配置文件并启动 Quart
 if __name__ == "__main__":
-    # 获取 asyncio 的事件循环
+    # 获取 Quart 应用的事件循环
     loop = asyncio.get_event_loop()
 
     # 启动 Watchdog 监控配置文件变化
     observer = Observer()
-    event_handler = ConfigFileHandler(loop)
+    event_handler = ConfigFileHandler(loop)  # 传入 Quart 应用的事件循环
     observer.schedule(event_handler, path=".", recursive=False)  # 监控项目目录
     observer.start()
 
