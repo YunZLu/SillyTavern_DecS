@@ -86,6 +86,12 @@ function start_flask_service() {
         return 1
     fi
 
+    # 检查端口是否被占用
+    if lsof -i :$DEFAULT_PORT > /dev/null; then
+        echo -e "${RED}>>> 端口 $DEFAULT_PORT 已被占用，正在杀死占用端口的进程...${NC}"
+        fuser -k "$DEFAULT_PORT"/tcp
+        echo -e "${GREEN}>>> 端口 $DEFAULT_PORT 已清空${NC}"
+    fi
 
     source "$VENV_PATH/bin/activate"
     echo -e "${GREEN}>>> Flask 服务启动中，按 Ctrl+C 退出...${NC}"
