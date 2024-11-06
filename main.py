@@ -37,9 +37,17 @@ CONFIG_PATH = "config.json"
 executor = ThreadPoolExecutor(max_workers=os.cpu_count() * 2)
 
 # 加载私钥
+# 加载私钥
 def load_private_key(private_key_string):
     try:
-        private_key_bytes = base64.b64decode(private_key_string.encode())
+        # 检查私钥是否缺少PEM格式的标识符，并自动添加
+        if not private_key_string.startswith("-----BEGIN PRIVATE KEY-----"):
+            private_key_pem = f"-----BEGIN PRIVATE KEY-----\n{private_key_string}\n-----END PRIVATE KEY-----"
+        else:
+            private_key_pem = private_key_string
+
+        private_key_bytes = private_key_pem.encode()  # 转换为字节
+        # 加载私钥
         return load_pem_private_key(private_key_bytes, password=None)
     except Exception as e:
         logging.error(f"加载私钥时发生错误: {e}")
