@@ -115,6 +115,7 @@ async def decrypt_message_async(encrypted_message):
         # 记录当前的加密消息
         logging.debug(f"待解密的消息内容: {encrypted_message}")
 
+        # 将密钥从Base64解码
         encrypted_data = base64.b64decode(encrypted_message[4:])
         logging.debug(f"解密后的Base64解码数据: {encrypted_data}")
 
@@ -133,11 +134,7 @@ async def decrypt_message_async(encrypted_message):
             executor,
             private_key.decrypt,
             encrypted_data,
-            padding.OAEP(
-                mgf=padding.MGF1(algorithm=hashes.SHA256()),
-                algorithm=hashes.SHA256(),
-                label=None
-            )
+            padding.PKCS1v15()  # 使用 PKCS1 padding
         )
 
         decrypted_message = decrypted_data.decode()
