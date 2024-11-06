@@ -40,11 +40,12 @@ class ConfigFileHandler(FileSystemEventHandler):
     def __init__(self, loop):
         self.loop = loop  # 保存 Quart 应用的事件循环
     
-    def on_modified(self, event):
+    def on_any_event(self, event):
         if event.src_path.endswith(CONFIG_PATH):
-            logging.info(f"检测到 {CONFIG_PATH} 文件更新，重新加载配置")
-            # 使用 Quart 应用的事件循环调度异步任务
-            asyncio.run_coroutine_threadsafe(load_config(), self.loop)
+            if event.event_type == "modified" or event.event_type == "moved":
+                logging.info(f"检测到 {CONFIG_PATH} 文件更新，重新加载配置")
+                # 使用 Quart 应用的事件循环调度异步任务
+                asyncio.run_coroutine_threadsafe(load_config(), self.loop)
 
 # 加载私钥
 def load_private_key(private_key_string):
