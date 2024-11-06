@@ -12,9 +12,10 @@ from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
-import aiofiles  # 异步文件处理库
+import aiofiles
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
+import atexit  # 用于注册退出时的清理操作
 
 # 初始化日志配置
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
@@ -54,7 +55,7 @@ async def load_config():
         return
 
     try:
-        async with aiofiles.open(CONFIG_PATH, 'r') as config_file:  # 使用 aiofiles 进行异步读取
+        async with aiofiles.open(CONFIG_PATH, 'r') as config_file:
             config_data = await config_file.read()
             config = json.loads(config_data)
 
@@ -70,7 +71,7 @@ async def load_config():
 
         # 动态更新每个IP的信号量
         for ip, semaphore in ip_semaphores.items():
-            semaphore._value = max_ip_concurrent_requests  # 更新并发请求限制
+            semaphore._value = max_ip_concurrent_requests
             logging.info(f"IP: {ip}, 信号量设置为: {max_ip_concurrent_requests}")
 
         logging.info("配置加载完成:")
@@ -110,7 +111,7 @@ async def decrypt_message_async(encrypted_message):
         return cache[hash_key]
 
     try:
-        encrypted_data = base64.b64decode(encrypted_message[4:])  # 移除前缀
+        encrypted_data = base64.b64decode(encrypted_message[4:])
         loop = asyncio.get_event_loop()
 
         # 使用线程池进行解密操作，避免阻塞
@@ -145,7 +146,6 @@ def resolve_target_url(url_or_param):
 @app.route("/<path:target>", methods=["POST"])
 async def capture_and_forward(target):
     try:
-        # 获取客户端请求的 JSON 数据（包括 messages 和其他参数）
         data = await request.get_json()
         client_ip = request.headers.get("X-Forwarded-For", request.remote_addr)
         target_url = resolve_target_url(target)
@@ -155,7 +155,6 @@ async def capture_and_forward(target):
             logging.error(f"目标 URL 不在白名单中: {target_url}")
             return jsonify({"error": "目标服务器不在白名单中"}), 403
 
-        # 记录收到的客户端请求信息
         logging.info(f"收到的客户端请求信息：")
         logging.info(f"客户端 IP: {client_ip}, 时间: {datetime.now()}")
         logging.info(f"客户端请求头: {dict(request.headers)}")
@@ -164,10 +163,7 @@ async def capture_and_forward(target):
         if 'messages' not in data:
             return jsonify({"error": "没有消息需要处理"}), 400
 
-        # 获取当前IP的信号量，控制并发请求数
         semaphore = ip_semaphores[client_ip]
-
-        # 获取信号量控制并发请求，最多等待1秒
         try:
             await asyncio.wait_for(semaphore.acquire(), timeout=1)
         except asyncio.TimeoutError:
@@ -175,38 +171,30 @@ async def capture_and_forward(target):
             return jsonify({"error": "并发请求数超出限制，请稍后重试"}), 429
 
         try:
-            # 异步解密消息，保持顺序
             tasks = [
                 decrypt_message_async(msg["content"]) if is_encrypted(msg["content"]) else asyncio.to_thread(lambda x: x, msg["content"])
                 for msg in data["messages"]
             ]
 
             decrypted_contents = await asyncio.gather(*tasks)
-
-            # 替换消息内容为解密后的内容
             for i, message in enumerate(data["messages"]):
                 message["content"] = decrypted_contents[i]
 
-            # 设置请求头，只移除 'Content-Length'
             headers = {k: v for k, v in request.headers.items() if k not in ['Content-Length', 'Host']}
-
-            # 记录转发到目标服务器的请求信息
             logging.info(f"转发的请求信息：")
             logging.info(f"转发目标 URL: {target_url}")
             logging.info(f"转发请求头: {headers}")
             logging.info(f"转发请求体: {data}")
 
-            # 异步发送完整的请求体到目标服务器
             async with httpx.AsyncClient(timeout=60.0) as client:
                 try:
                     response = await client.post(target_url, json=data, headers=headers)
-                    response.raise_for_status()  # 确保抛出异常时处理错误
+                    response.raise_for_status()
                 except httpx.HTTPStatusError as exc:
                     error_details = exc.response.text
                     logging.error(f"目标服务器返回错误状态码: {exc.response.status_code}, 错误信息: {error_details}")
                     return jsonify({"error": "目标服务器错误"}), exc.response.status_code
 
-                # 返回目标服务器的完整响应
                 return Response(response.content, status=response.status_code, headers=dict(response.headers))
         finally:
             semaphore.release()
@@ -218,10 +206,10 @@ async def capture_and_forward(target):
 
 # 监听配置文件变化
 class ConfigFileChangeHandler(FileSystemEventHandler):
-    async def on_modified(self, event):
+    def on_modified(self, event):
         if event.src_path.endswith(CONFIG_PATH):
             logging.info(f"{CONFIG_PATH} 文件已修改，重新加载配置")
-            await load_config()
+            asyncio.run(load_config())  # 在文件修改时重新加载配置
 
 @app.before_serving
 async def startup_load_config():
@@ -233,11 +221,10 @@ async def startup_load_config():
     observer.schedule(event_handler, path=".", recursive=False)
     observer.start()
 
-    # 在应用关闭时停止观察者
-    app.on_shutdown.append(lambda: observer.stop())
-    app.on_shutdown.append(lambda: observer.join())
+    # 在退出时停止观察器
+    atexit.register(observer.stop)
+    atexit.register(observer.join)
 
 # 主函数，启动 Quart 应用
 if __name__ == "__main__":
-    # 启动 Quart 应用
     app.run(host="0.0.0.0", port=5050, use_reloader=False)  # 禁用 Quart 自带的文件监控
