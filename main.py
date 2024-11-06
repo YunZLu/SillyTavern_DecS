@@ -39,7 +39,7 @@ executor = ThreadPoolExecutor(max_workers=os.cpu_count() * 2)
 # 加载私钥
 def load_private_key(private_key_string):
     try:
-        private_key_bytes = base64.b64decode(private_key_string.replace("\n", "").replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "").strip())
+        private_key_bytes = private_key_string.encode("utf-8")
         return load_pem_private_key(private_key_bytes, password=None)
     except Exception as e:
         logging.error(f"加载私钥时发生错误: {e}")
