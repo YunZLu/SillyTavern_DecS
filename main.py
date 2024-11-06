@@ -108,24 +108,42 @@ async def decrypt_message_async(encrypted_message):
     
     # 优先从缓存获取解密内容
     if hash_key in cache:
+        logging.info(f"从缓存中获取解密结果，哈希键: {hash_key}")
         return cache[hash_key]
 
     try:
+        # 检查消息格式和内容
+        logging.debug(f"尝试解密消息，内容: {encrypted_message}")
+        
+        # 移除 'ENC:' 前缀并解码为二进制数据
         encrypted_data = base64.b64decode(encrypted_message[4:])
+        logging.debug(f"Base64 解码成功，数据长度: {len(encrypted_data)} 字节")
+
+        # 获取事件循环
         loop = asyncio.get_event_loop()
 
         # 使用线程池进行解密操作，避免阻塞
         decrypted_data = await loop.run_in_executor(
-            executor, private_key.decrypt, encrypted_data, padding.OAEP(
-                mgf=padding.MGF1(algorithm=hashes.SHA256()), algorithm=hashes.SHA256(), label=None
+            executor,
+            private_key.decrypt,
+            encrypted_data,
+            padding.OAEP(
+                mgf=padding.MGF1(algorithm=hashes.SHA256()),
+                algorithm=hashes.SHA256(),
+                label=None
             )
         )
 
         decrypted_message = decrypted_data.decode()
-        cache[hash_key] = decrypted_message  # 将解密结果缓存
+        logging.info(f"解密成功，解密后的消息: {decrypted_message}")
+
+        # 缓存解密结果
+        cache[hash_key] = decrypted_message
         return decrypted_message
     except Exception as e:
+        # 捕获并记录详细的异常信息
         logging.error(f"解密消息时发生错误: {e}")
+        logging.debug("加密数据:", exc_info=True)  # 添加完整异常信息
         return encrypted_message  # 解密失败时返回原始消息
 
 # 解析目标 URL
