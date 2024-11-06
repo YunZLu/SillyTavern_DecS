@@ -15,7 +15,7 @@ from datetime import datetime
 import aiofiles
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-import atexit  # 用于注册退出时的清理操作
+import signal
 
 # 初始化日志配置
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
@@ -39,7 +39,6 @@ executor = ThreadPoolExecutor(max_workers=os.cpu_count() * 2)
 # 加载私钥
 def load_private_key(private_key_string):
     try:
-        # 去掉换行符后再进行解码
         private_key_bytes = base64.b64decode(private_key_string.replace("\n", "").replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "").strip())
         return load_pem_private_key(private_key_bytes, password=None)
     except Exception as e:
@@ -218,13 +217,19 @@ async def startup_load_config():
 
     # 启动文件监听器
     event_handler = ConfigFileChangeHandler()
-    observer = Observer()
     observer.schedule(event_handler, path=".", recursive=False)
     observer.start()
 
-    # 在退出时停止观察器
-    atexit.register(observer.stop)
-    atexit.register(observer.join)
+# 捕获 SIGINT 信号以处理退出
+def handle_exit(*args):
+    logging.info("接收到退出信号，正在停止服务...")
+    observer.stop()
+    observer.join()
+    asyncio.get_event_loop().stop()
+    logging.info("服务已停止")
+
+# 注册 SIGINT 信号处理器
+signal.signal(signal.SIGINT, handle_exit)
 
 # 主函数，启动 Quart 应用
 if __name__ == "__main__":
