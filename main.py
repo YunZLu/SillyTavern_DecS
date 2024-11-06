@@ -211,6 +211,8 @@ class ConfigFileChangeHandler(FileSystemEventHandler):
             logging.info(f"{CONFIG_PATH} 文件已修改，重新加载配置")
             asyncio.run(load_config())  # 在文件修改时重新加载配置
 
+observer = Observer()  # 在全局作用域中定义观察器
+
 @app.before_serving
 async def startup_load_config():
     await load_config()  # 首次启动加载配置
