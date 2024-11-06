@@ -310,6 +310,8 @@ else
     echo -e "${YELLOW}>>> 项目尚未部署，开始部署流程...${NC}"
     retry_function install_and_check_dependencies
     retry_function update_project
+    set_private_key
+    add_whitelist
     retry_function setup_python_env
     while true; do
         show_menu
