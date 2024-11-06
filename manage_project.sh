@@ -79,7 +79,7 @@ function setup_python_env() {
 # 启动 Flask 服务
 function start_flask_service() {
     echo -e "${YELLOW}>>> 启动 Flask 服务...${NC}"
-    cd /root/$PROJECT_NAME
+    cd /root/$PROJECT_NAME 2>/dev/null
 
     if [ ! -d "$VENV_PATH" ]; then
         echo -e "${RED}>>> Python 虚拟环境未创建，无法启动服务。请先部署项目。${NC}"
