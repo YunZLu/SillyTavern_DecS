@@ -225,9 +225,13 @@ async def startup_load_config():
 # 捕获 SIGINT 信号以处理退出
 def handle_exit(*args):
     logging.info("接收到退出信号，正在停止服务...")
+
+    # 停止文件观察器
     observer.stop()
     observer.join()
-    asyncio.get_event_loop().stop()
+
+    # 使用 Quart 的 shutdown 方法关闭应用
+    asyncio.create_task(app.shutdown())
     logging.info("服务已停止")
 
 # 注册 SIGINT 信号处理器
