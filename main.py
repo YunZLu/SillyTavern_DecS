@@ -10,8 +10,6 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 from collections import defaultdict
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 import aiofiles  # 异步文件处理库
@@ -35,18 +33,6 @@ CONFIG_PATH = "config.json"
 # 动态创建线程池，用于异步解密操作，线程数基于 CPU 核心数量
 executor = ThreadPoolExecutor(max_workers=os.cpu_count() * 2)
 
-# 监控配置文件的 Handler
-class ConfigFileHandler(FileSystemEventHandler):
-    def __init__(self, loop):
-        self.loop = loop  # 保存 Quart 应用的事件循环
-    
-    def on_any_event(self, event):
-        if event.src_path.endswith(CONFIG_PATH):
-            if event.event_type == "modified" or event.event_type == "moved":
-                logging.info(f"检测到 {CONFIG_PATH} 文件更新，重新加载配置")
-                # 使用 Quart 应用的事件循环调度异步任务
-                self.loop.create_task(load_config())  # 改用 create_task
-
 # 加载私钥
 def load_private_key(private_key_string):
     try:
@@ -56,7 +42,7 @@ def load_private_key(private_key_string):
         logging.error(f"加载私钥时发生错误: {e}")
         return None
 
-# 重新加载配置文件
+# 加载配置文件
 async def load_config():
     global private_key, whitelist, max_ip_concurrent_requests
 
@@ -233,20 +219,7 @@ async def capture_and_forward(target):
 async def startup_load_config():
     await load_config()
 
-# 主函数，设置 Watchdog 监控配置文件并启动 Quart
+# 主函数，启动 Quart 应用
 if __name__ == "__main__":
-    # 获取 Quart 应用的事件循环
-    loop = asyncio.get_event_loop()
-
-    # 启动 Watchdog 监控配置文件变化
-    observer = Observer()
-    event_handler = ConfigFileHandler(loop)  # 传入 Quart 应用的事件循环
-    observer.schedule(event_handler, path=".", recursive=False)  # 监控项目目录
-    observer.start()
-
     # 启动 Quart 应用
-    try:
-        app.run(host="0.0.0.0", port=5050, use_reloader=False)  # 禁用 Quart 自带的文件监控
-    finally:
-        observer.stop()
-        observer.join()
+    app.run(host="0.0.0.0", port=5050, use_reloader=False)  # 禁用 Quart 自带的文件监控
