@@ -13,6 +13,8 @@ from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 import aiofiles  # 异步文件处理库
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
 # 初始化日志配置
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)s: %(message)s')
@@ -214,10 +216,26 @@ async def capture_and_forward(target):
         logging.error(f"处理请求时发生错误: {e}")
         return jsonify({"error": "内部错误"}), 500
 
-# 在 Quart 应用启动前加载配置
+# 监听配置文件变化
+class ConfigFileChangeHandler(FileSystemEventHandler):
+    async def on_modified(self, event):
+        if event.src_path.endswith(CONFIG_PATH):
+            logging.info(f"{CONFIG_PATH} 文件已修改，重新加载配置")
+            await load_config()
+
 @app.before_serving
 async def startup_load_config():
-    await load_config()
+    await load_config()  # 首次启动加载配置
+
+    # 启动文件监听器
+    event_handler = ConfigFileChangeHandler()
+    observer = Observer()
+    observer.schedule(event_handler, path=".", recursive=False)
+    observer.start()
+
+    # 在应用关闭时停止观察者
+    app.on_shutdown.append(lambda: observer.stop())
+    app.on_shutdown.append(lambda: observer.join())
 
 # 主函数，启动 Quart 应用
 if __name__ == "__main__":
