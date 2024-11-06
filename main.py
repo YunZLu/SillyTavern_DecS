@@ -190,6 +190,8 @@ async def capture_and_forward(target):
                 try:
                     response = await client.post(target_url, json=data, headers=headers)
                     response.raise_for_status()
+                    logging.info(f"目标服务器响应状态码: {response.status_code}")
+                    logging.info(f"目标服务器响应内容: {response.text}")
                 except httpx.HTTPStatusError as exc:
                     error_details = exc.response.text
                     logging.error(f"目标服务器返回错误状态码: {exc.response.status_code}, 错误信息: {error_details}")
