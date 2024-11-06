@@ -104,25 +104,29 @@ def is_encrypted(content):
 
 # 异步解密消息，并缓存
 async def decrypt_message_async(encrypted_message):
+    # 生成哈希键，用于缓存
     hash_key = generate_hash(encrypted_message)
     
     # 优先从缓存获取解密内容
     if hash_key in cache:
-        logging.info(f"从缓存中获取解密结果，哈希键: {hash_key}")
+        logging.info(f"从缓存获取解密消息，哈希键：{hash_key}")
         return cache[hash_key]
 
+    # 添加日志：输出待解密消息
+    logging.debug(f"待解密消息：{encrypted_message}")
+
     try:
-        # 检查消息格式和内容
-        logging.debug(f"尝试解密消息，内容: {encrypted_message}")
-        
-        # 移除 'ENC:' 前缀并解码为二进制数据
+        # Base64 解码加密数据
         encrypted_data = base64.b64decode(encrypted_message[4:])
-        logging.debug(f"Base64 解码成功，数据长度: {len(encrypted_data)} 字节")
+        logging.debug(f"Base64 解码后的数据长度：{len(encrypted_data)}")
 
-        # 获取事件循环
-        loop = asyncio.get_event_loop()
-
+        # 检查私钥是否已加载
+        if private_key is None:
+            logging.error("私钥未加载，无法解密消息")
+            return encrypted_message  # 私钥加载失败时返回原始消息
+        
         # 使用线程池进行解密操作，避免阻塞
+        loop = asyncio.get_event_loop()
         decrypted_data = await loop.run_in_executor(
             executor,
             private_key.decrypt,
@@ -134,16 +138,24 @@ async def decrypt_message_async(encrypted_message):
             )
         )
 
+        # 解密成功后将解密消息存入缓存
         decrypted_message = decrypted_data.decode()
-        logging.info(f"解密成功，解密后的消息: {decrypted_message}")
-
-        # 缓存解密结果
         cache[hash_key] = decrypted_message
+        logging.info(f"解密成功，哈希键：{hash_key}")
+
         return decrypted_message
-    except Exception as e:
-        # 捕获并记录详细的异常信息
+
+    except base64.binascii.Error as e:
+        logging.error(f"Base64 解码失败: {e}")
+        return encrypted_message  # 解码失败时返回原始消息
+
+    except ValueError as e:
         logging.error(f"解密消息时发生错误: {e}")
-        logging.debug("加密数据:", exc_info=True)  # 添加完整异常信息
+        logging.debug("请检查加密格式是否正确，或确认私钥和填充方式是否匹配")
+        return encrypted_message  # 解密失败时返回原始消息
+
+    except Exception as e:
+        logging.error(f"解密过程中出现未知错误: {e}")
         return encrypted_message  # 解密失败时返回原始消息
 
 # 解析目标 URL
