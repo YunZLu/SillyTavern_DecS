@@ -18,7 +18,7 @@ from watchdog.events import FileSystemEventHandler
 import signal
 
 # 初始化日志配置
-logging.basicConfig(level=logging.debug, format='%(asctime)s %(levelname)s: %(message)s')
+logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)s: %(message)s')
 
 # 初始化 Quart 应用
 app = Quart(__name__)
